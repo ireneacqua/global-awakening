@@ -7,6 +7,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
@@ -283,28 +284,16 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        const storage = {
-            async get(key, shared = false) {
-                const value = localStorage.getItem(key);
-                return value ? { key, value, shared } : null;
-            },
-            async set(key, value, shared = false) {
-                localStorage.setItem(key, value);
-                return { key, value, shared };
-            },
-            async delete(key, shared = false) {
-                localStorage.removeItem(key);
-                return { key, deleted: true, shared };
-            }
-        };
-
-        window.storage = storage;
+        // Initialize Supabase
+        const supabase = window.supabase.createClient(
+            'https://vxzxdkcluyrcftsnxxza.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4enhka2NsdXlyY2Z0c254eHphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg0MTQwOTUsImV4cCI6MjA1Mzk5MDA5NX0.sb_publishable_AzwgfHpTfTDzi5n6fgFUDA_Qba_KX42'
+        );
 
         const Star = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
         const Brain = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path></svg>;
         const Send = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
         const Calendar = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
-        const MapPin = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>;
         const Users = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
 
         const telepathySymbols = [
@@ -331,7 +320,7 @@
             title: "Global Awakening",
             subtitle: "Unite in Light, Awaken as One",
             enterPlatform: "Enter Platform",
-            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map", community: "Community" },
+            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map" },
             rituals: {
               title: "Global Rituals",
               subtitle: "Synchronized awakening ceremonies",
@@ -365,7 +354,7 @@
             title: "Risveglio Globale",
             subtitle: "Uniti nella Luce, Risvegliati come Uno",
             enterPlatform: "Entra",
-            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa", community: "Community" },
+            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa" },
             rituals: {
               title: "Rituali Globali",
               subtitle: "Cerimonie di risveglio sincronizzate",
@@ -434,6 +423,7 @@
           const sessionId = useRef(Date.now() + '-' + Math.random());
           const t = translations[lang];
 
+          // Load scores
           useEffect(() => {
             const score = localStorage.getItem('telepathy_score');
             const best = localStorage.getItem('telepathy_best');
@@ -441,6 +431,7 @@
             if (best) setBestScore(parseInt(best));
           }, []);
 
+          // Update presence in Supabase
           useEffect(() => {
             if (!nickname && !tempNickname) return;
             
@@ -448,24 +439,18 @@
               const lat = 20 + Math.random() * 50;
               const lng = -120 + Math.random() * 200;
               
-              const presence = {
+              await supabase.from('online_users').upsert({
                 id: sessionId.current,
                 nickname: nickname || 'Anonymous',
                 lat,
                 lng,
-                lastSeen: Date.now()
-              };
+                last_seen: new Date().toISOString()
+              });
               
-              try {
-                const data = await storage.get('online_users', true);
-                let users = data ? JSON.parse(data.value) : [];
-                users = users.filter(u => Date.now() - u.lastSeen < 60000);
-                const idx = users.findIndex(u => u.id === sessionId.current);
-                if (idx >= 0) users[idx] = presence;
-                else users.push(presence);
-                await storage.set('online_users', JSON.stringify(users), true);
-                setOnlineUsers(users);
-              } catch (e) {}
+              // Clean old users and fetch current
+              await supabase.from('online_users').delete().lt('last_seen', new Date(Date.now() - 60000).toISOString());
+              const { data } = await supabase.from('online_users').select('*');
+              if (data) setOnlineUsers(data);
             };
 
             updatePresence();
@@ -473,49 +458,52 @@
             return () => clearInterval(interval);
           }, [nickname, tempNickname]);
 
+          // Load data from Supabase
           useEffect(() => {
             const loadData = async () => {
-              try {
-                const data = await storage.get('global_chat', true);
-                if (data) setChatMessages(JSON.parse(data.value));
-              } catch (e) {}
+              const { data: messages } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: true }).limit(50);
+              if (messages) setChatMessages(messages);
               
-              try {
-                const data = await storage.get('global_rituals', true);
-                if (data) setRituals(JSON.parse(data.value));
-              } catch (e) {}
+              const { data: ritualsData } = await supabase.from('rituals').select('*').order('created_at', { ascending: false });
+              if (ritualsData) setRituals(ritualsData);
             };
+            
             loadData();
             const interval = setInterval(loadData, 3000);
-            return () => clearInterval(interval);
+            
+            // Subscribe to real-time updates
+            const ritualsChannel = supabase.channel('rituals-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'rituals' }, () => loadData()).subscribe();
+            const chatChannel = supabase.channel('chat-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => loadData()).subscribe();
+            
+            return () => {
+              clearInterval(interval);
+              ritualsChannel.unsubscribe();
+              chatChannel.unsubscribe();
+            };
           }, []);
 
+          // Telepathy matching
           useEffect(() => {
             if (!searchingPartner) return;
 
             const findPartner = async () => {
-              try {
-                const data = await storage.get('telepathy_queue', true);
-                let queue = data ? JSON.parse(data.value) : [];
-                queue = queue.filter(q => Date.now() - q.timestamp < 60000);
-                queue = queue.filter(q => q.id !== sessionId.current);
-                
-                const available = queue.find(q => q.id !== sessionId.current);
-                if (available) {
-                  setPartner(available);
-                  setRole(Math.random() > 0.5 ? 'sender' : 'receiver');
-                  setSearchingPartner(false);
-                  queue = queue.filter(q => q.id !== available.id);
-                  await storage.set('telepathy_queue', JSON.stringify(queue), true);
-                } else {
-                  queue.push({
-                    id: sessionId.current,
-                    nickname: nickname || 'Anonymous',
-                    timestamp: Date.now()
-                  });
-                  await storage.set('telepathy_queue', JSON.stringify(queue), true);
-                }
-              } catch (e) {}
+              await supabase.from('telepathy_queue').delete().lt('timestamp', Date.now() - 60000);
+              
+              const { data: queue } = await supabase.from('telepathy_queue').select('*').neq('id', sessionId.current);
+              
+              if (queue && queue.length > 0) {
+                const available = queue[0];
+                setPartner(available);
+                setRole(Math.random() > 0.5 ? 'sender' : 'receiver');
+                setSearchingPartner(false);
+                await supabase.from('telepathy_queue').delete().eq('id', available.id);
+              } else {
+                await supabase.from('telepathy_queue').upsert({
+                  id: sessionId.current,
+                  nickname: nickname || 'Anonymous',
+                  timestamp: Date.now()
+                });
+              }
             };
 
             findPartner();
@@ -595,84 +583,59 @@
           const sendChatMessage = async () => {
             if (!newMessage.trim()) return;
             
-            const message = {
-              id: Date.now(),
-              user: nickname || 'Anonymous',
-              content: newMessage,
-              timestamp: new Date().toISOString()
-            };
+            await supabase.from('chat_messages').insert({
+              user_name: nickname || 'Anonymous',
+              content: newMessage
+            });
             
-            try {
-              const data = await storage.get('global_chat', true);
-              let messages = data ? JSON.parse(data.value) : [];
-              messages.push(message);
-              messages = messages.slice(-50);
-              await storage.set('global_chat', JSON.stringify(messages), true);
-              setChatMessages(messages);
-              setNewMessage('');
-            } catch (e) {}
+            setNewMessage('');
           };
 
           const createRitual = async () => {
             if (!newRitual.name || !newRitual.date || !newRitual.time) return;
             
-            const ritual = {
-              id: Date.now(),
+            await supabase.from('rituals').insert({
               creator: nickname || 'Anonymous',
-              creatorId: sessionId.current,
-              ...newRitual,
+              creator_id: sessionId.current,
+              name: newRitual.name,
+              description: newRitual.description,
+              type: newRitual.type,
+              sacred_number: newRitual.sacredNumber,
+              date: newRitual.date,
+              time: newRitual.time,
+              duration: newRitual.duration,
               participants: [sessionId.current],
-              energy: 0,
-              createdAt: Date.now()
-            };
+              energy: 0
+            });
             
-            try {
-              const data = await storage.get('global_rituals', true);
-              let all = data ? JSON.parse(data.value) : [];
-              all.push(ritual);
-              await storage.set('global_rituals', JSON.stringify(all), true);
-              setRituals(all);
-              setShowCreateRitual(false);
-              setNewRitual({
-                name: '',
-                description: '',
-                type: 'consciousness',
-                sacredNumber: 11,
-                date: '',
-                time: '',
-                duration: 30
-              });
-            } catch (e) {}
+            setShowCreateRitual(false);
+            setNewRitual({
+              name: '',
+              description: '',
+              type: 'consciousness',
+              sacredNumber: 11,
+              date: '',
+              time: '',
+              duration: 30
+            });
           };
 
           const joinRitual = async (ritualId) => {
-            try {
-              const data = await storage.get('global_rituals', true);
-              let all = data ? JSON.parse(data.value) : [];
-              all = all.map(r => {
-                if (r.id === ritualId && !r.participants.includes(sessionId.current)) {
-                  return { ...r, participants: [...r.participants, sessionId.current] };
-                }
-                return r;
-              });
-              await storage.set('global_rituals', JSON.stringify(all), true);
-              setRituals(all);
-            } catch (e) {}
+            const ritual = rituals.find(r => r.id === ritualId);
+            if (!ritual || ritual.participants.includes(sessionId.current)) return;
+            
+            await supabase.from('rituals').update({
+              participants: [...ritual.participants, sessionId.current]
+            }).eq('id', ritualId);
           };
 
           const sendEnergy = async (ritualId) => {
-            try {
-              const data = await storage.get('global_rituals', true);
-              let all = data ? JSON.parse(data.value) : [];
-              all = all.map(r => {
-                if (r.id === ritualId) {
-                  return { ...r, energy: r.energy + 10 };
-                }
-                return r;
-              });
-              await storage.set('global_rituals', JSON.stringify(all), true);
-              setRituals(all);
-            } catch (e) {}
+            const ritual = rituals.find(r => r.id === ritualId);
+            if (!ritual) return;
+            
+            await supabase.from('rituals').update({
+              energy: ritual.energy + 10
+            }).eq('id', ritualId);
           };
 
           const getRitualStatus = (ritual) => {
@@ -816,7 +779,7 @@
                                 <h3 className="text-xl font-bold text-white mb-1">{ritual.name}</h3>
                                 <p className="text-secondary text-sm">{ritual.description}</p>
                               </div>
-                              <div className="text-2xl" style={{color: '#fbbf24'}}>{ritual.sacredNumber}</div>
+                              <div className="text-2xl" style={{color: '#fbbf24'}}>{ritual.sacred_number}</div>
                             </div>
 
                             <div className="flex items-center gap-2 mb-3">
@@ -1032,8 +995,8 @@
                       {chatMessages.map((msg) => (
                         <div key={msg.id} className="chat-message">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-primary font-medium text-sm">{msg.user}</span>
-                            <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                            <span className="text-primary font-medium text-sm">{msg.user_name}</span>
+                            <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.created_at).toLocaleTimeString()}</span>
                           </div>
                           <p className="text-white">{msg.content}</p>
                         </div>
