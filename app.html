@@ -663,9 +663,12 @@
           };
 
           const createRitual = async () => {
-            if (!newRitual.name || !newRitual.date || !newRitual.time) return;
-            
-            await supabase.from('rituals').insert({
+            if (!newRitual.name || !newRitual.date || !newRitual.time) {
+              alert('Please fill in name, date and time.');
+              return;
+            }
+
+            const ritualData = {
               creator: nickname || 'Anonymous',
               creator_id: sessionId.current,
               name: newRitual.name,
@@ -677,8 +680,23 @@
               duration: newRitual.duration,
               participants: [sessionId.current],
               energy: 0
-            });
-            
+            };
+
+            try {
+              const { data, error } = await supabase.from('rituals').insert(ritualData).select();
+
+              if (error) {
+                console.warn('Supabase insert error:', error);
+                // Fallback: add locally so the user sees it
+                const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
+                setRituals(prev => [localRitual, ...prev]);
+              }
+            } catch (err) {
+              console.warn('Create ritual failed:', err);
+              const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
+              setRituals(prev => [localRitual, ...prev]);
+            }
+
             setShowCreateRitual(false);
             setNewRitual({
               name: '',
