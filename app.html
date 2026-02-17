@@ -153,12 +153,22 @@
         .transition-all { transition: all 0.3s; }
         
         .tab-active {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: rgba(20, 10, 50, 0.8);
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.05rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
-        .tab-inactive { color: #e9d5ff; }
-        .tab-inactive:hover { background: rgba(255, 255, 255, 0.1); }
+        .tab-inactive {
+            color: #fff;
+            font-weight: 600;
+            font-size: 1.05rem;
+            background: rgba(30, 20, 60, 0.5);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+        .tab-inactive:hover { background: rgba(30, 20, 60, 0.7); }
         
         .symbol-btn {
             font-size: 3.75rem;
@@ -442,30 +452,48 @@
 
           // Update presence in Supabase
           useEffect(() => {
-            if (!nickname && !tempNickname) return;
-            
+            if (!nickname) return;
+
+            const myLat = 20 + Math.random() * 50;
+            const myLng = -120 + Math.random() * 200;
+
             const updatePresence = async () => {
-              const lat = 20 + Math.random() * 50;
-              const lng = -120 + Math.random() * 200;
-              
-              await supabase.from('online_users').upsert({
-                id: sessionId.current,
-                nickname: nickname || 'Anonymous',
-                lat,
-                lng,
-                last_seen: new Date().toISOString()
-              });
-              
-              // Clean old users and fetch current
-              await supabase.from('online_users').delete().lt('last_seen', new Date(Date.now() - 60000).toISOString());
-              const { data } = await supabase.from('online_users').select('*');
-              if (data) setOnlineUsers(data);
+              try {
+                const { error: upsertError } = await supabase.from('online_users').upsert({
+                  id: sessionId.current,
+                  nickname: nickname || 'Anonymous',
+                  lat: myLat,
+                  lng: myLng,
+                  last_seen: new Date().toISOString()
+                });
+
+                if (upsertError) console.warn('Presence upsert error:', upsertError);
+
+                // Clean old users
+                await supabase.from('online_users').delete().lt('last_seen', new Date(Date.now() - 60000).toISOString());
+
+                // Fetch current online users
+                const { data, error: fetchError } = await supabase.from('online_users').select('*');
+                if (fetchError) {
+                  console.warn('Fetch online users error:', fetchError);
+                  // Fallback: at least show yourself
+                  setOnlineUsers([{ id: sessionId.current, nickname, lat: myLat, lng: myLng }]);
+                } else {
+                  setOnlineUsers(data && data.length > 0 ? data : [{ id: sessionId.current, nickname, lat: myLat, lng: myLng }]);
+                }
+              } catch (err) {
+                console.warn('Presence update failed:', err);
+                setOnlineUsers([{ id: sessionId.current, nickname, lat: myLat, lng: myLng }]);
+              }
             };
 
             updatePresence();
             const interval = setInterval(updatePresence, 10000);
-            return () => clearInterval(interval);
-          }, [nickname, tempNickname]);
+            return () => {
+              clearInterval(interval);
+              supabase.from('online_users').delete().eq('id', sessionId.current);
+            };
+          }, [nickname]);
 
           // Load data from Supabase
           useEffect(() => {
