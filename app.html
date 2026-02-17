@@ -487,17 +487,24 @@
             if (!searchingPartner) return;
 
             const findPartner = async () => {
+              // Clean old entries
               await supabase.from('telepathy_queue').delete().lt('timestamp', Date.now() - 60000);
               
-              const { data: queue } = await supabase.from('telepathy_queue').select('*').neq('id', sessionId.current);
+              // Get all waiting people
+              const { data: queue } = await supabase.from('telepathy_queue').select('*').neq('id', sessionId.current).order('timestamp', { ascending: true });
               
               if (queue && queue.length > 0) {
+                // Match with first person in queue
                 const available = queue[0];
                 setPartner(available);
                 setRole(Math.random() > 0.5 ? 'sender' : 'receiver');
                 setSearchingPartner(false);
+                
+                // Remove both from queue
+                await supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
                 await supabase.from('telepathy_queue').delete().eq('id', available.id);
               } else {
+                // Add self to queue
                 await supabase.from('telepathy_queue').upsert({
                   id: sessionId.current,
                   nickname: nickname || 'Anonymous',
@@ -508,8 +515,35 @@
 
             findPartner();
             const interval = setInterval(findPartner, 2000);
-            return () => clearInterval(interval);
+            return () => {
+              clearInterval(interval);
+              // Remove from queue when stopping search
+              if (searchingPartner) {
+                supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
+              }
+            };
           }, [searchingPartner, nickname]);
+          
+          // Show queue position
+          const [queuePosition, setQueuePosition] = useState(0);
+          const [queueSize, setQueueSize] = useState(0);
+          
+          useEffect(() => {
+            if (!searchingPartner) return;
+            
+            const checkQueue = async () => {
+              const { data: queue } = await supabase.from('telepathy_queue').select('*').order('timestamp', { ascending: true });
+              if (queue) {
+                setQueueSize(queue.length);
+                const myPosition = queue.findIndex(q => q.id === sessionId.current);
+                setQueuePosition(myPosition >= 0 ? myPosition + 1 : 0);
+              }
+            };
+            
+            checkQueue();
+            const interval = setInterval(checkQueue, 1000);
+            return () => clearInterval(interval);
+          }, [searchingPartner]);
 
           const handleEnter = () => {
             setNickname(tempNickname || 'Anonymous');
@@ -886,6 +920,12 @@
                       <div className="text-center" style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
                         <div style={{fontSize: '4rem'}} className="pulse-glow">🔮</div>
                         <p className="text-white text-xl">Searching for partner...</p>
+                        {queueSize > 1 && (
+                          <div className="bg-glass-dark rounded-xl p-4">
+                            <p className="text-primary">Queue position: <span className="text-white font-bold">{queuePosition}</span> / {queueSize}</p>
+                            <p className="text-secondary text-sm mt-2">{queueSize - 1} starseed{queueSize > 2 ? 's' : ''} waiting</p>
+                          </div>
+                        )}
                         <button onClick={() => setSearchingPartner(false)} className="btn-secondary">Cancel</button>
                       </div>
                     )}
@@ -894,7 +934,10 @@
                       <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                         <div className="result-success rounded-xl p-4 text-center">
                           <p style={{color: '#4ade80'}} className="font-bold">✨ Partner found!</p>
-                          <p className="text-white mt-2">Your role: <span className="font-bold">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</span></p>
+                          <p className="text-white mt-2">
+                            Training with: <span className="font-bold text-yellow-300">{partner.nickname}</span>
+                          </p>
+                          <p className="text-secondary text-sm mt-1">Your role: <span className="font-bold text-white">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</span></p>
                         </div>
 
                         {role === 'sender' && !waitingForPartner && (
