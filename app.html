@@ -7,9 +7,274 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; padding: 0; overflow-x: hidden; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+        
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        
+        @keyframes ripple {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        .ripple { animation: ripple 2s ease-out infinite; }
+        
+        .bg-gradient { background: linear-gradient(135deg, #312e81 0%, #7c3aed 50%, #db2777 100%); }
+        .bg-glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); }
+        .bg-glass-dark { background: rgba(255, 255, 255, 0.05); }
+        .border-glass { border: 1px solid rgba(255, 255, 255, 0.2); }
+        .text-primary { color: #a78bfa; }
+        .text-secondary { color: #e9d5ff; }
+        
+        .btn-primary { 
+            background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 50%, #fbbf24 100%);
+            color: white;
+            font-weight: bold;
+            padding: 1rem 2rem;
+            border-radius: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 20px 40px rgba(139, 92, 246, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.2); }
+        
+        .container { max-width: 1280px; margin: 0 auto; padding: 0 1rem; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .grid { display: grid; }
+        .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+        
+        .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-8 { padding: 2rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-4 { margin-top: 1rem; }
+        
+        .w-full { width: 100%; }
+        .min-h-screen { min-height: 100vh; }
+        .max-w-md { max-width: 28rem; }
+        
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-2xl { border-radius: 1rem; }
+        .rounded-3xl { border-radius: 1.5rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-full { border-radius: 9999px; }
+        .border-b { border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
+        .border-t { border-top: 1px solid rgba(255, 255, 255, 0.2); }
+        
+        .text-xs { font-size: 0.75rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-base { font-size: 1rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .text-3xl { font-size: 1.875rem; }
+        .text-4xl { font-size: 2.25rem; }
+        .text-6xl { font-size: 3.75rem; }
+        .font-medium { font-weight: 500; }
+        .font-bold { font-weight: 700; }
+        .text-center { text-align: center; }
+        .text-white { color: white; }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 1rem;
+        }
+        input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.5); }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #a78bfa; }
+        
+        .fixed { position: fixed; }
+        .sticky { position: sticky; }
+        .absolute { position: absolute; }
+        .relative { position: relative; }
+        .top-0 { top: 0; }
+        .top-4 { top: 1rem; }
+        .right-4 { right: 1rem; }
+        .left-0 { left: 0; }
+        .bottom-0 { bottom: 0; }
+        .z-50 { z-index: 50; }
+        
+        .overflow-y-auto { overflow-y: auto; }
+        .flex-1 { flex: 1; }
+        .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .transition-all { transition: all 0.3s; }
+        
+        .tab-active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .tab-inactive { color: #e9d5ff; }
+        .tab-inactive:hover { background: rgba(255, 255, 255, 0.1); }
+        
+        .symbol-btn {
+            font-size: 3.75rem;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .symbol-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .symbol-btn-selected {
+            background: rgba(139, 92, 246, 0.5);
+            border-color: #a78bfa;
+            transform: scale(1.1);
+        }
+        
+        .result-success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .result-try-again {
+            background: rgba(251, 146, 60, 0.2);
+            border: 1px solid rgba(251, 146, 60, 0.5);
+        }
+        
+        .chat-container { height: 600px; display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 1rem; }
+        .chat-message {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .online-dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            background: #4ade80;
+            border-radius: 50%;
+        }
+        
+        .ritual-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+        .ritual-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .ritual-live {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(16, 185, 129, 0.3));
+            border-color: #4ade80;
+        }
+        
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        
+        .map-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #fbbf24;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+        }
+        
+        .map-point:hover {
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+        
+        .map-ripple {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #fbbf24;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1rem;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, rgba(49, 46, 129, 0.95), rgba(124, 58, 237, 0.95));
+            border-radius: 1.5rem;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .grid-cols-3 { grid-template-columns: repeat(2, 1fr); }
+            .text-4xl { font-size: 2rem; }
+            .text-3xl { font-size: 1.5rem; }
+            .text-2xl { font-size: 1.25rem; }
+            .symbol-btn { font-size: 3rem; padding: 1rem; }
+            .map-container { height: 400px; }
+        }
     </style>
 </head>
 <body>
@@ -18,314 +283,29 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // Storage wrapper per localStorage
-        window.storage = {
+        const storage = {
             async get(key, shared = false) {
                 const value = localStorage.getItem(key);
                 return value ? { key, value, shared } : null;
             },
-            
             async set(key, value, shared = false) {
                 localStorage.setItem(key, value);
                 return { key, value, shared };
             },
-            
             async delete(key, shared = false) {
                 localStorage.removeItem(key);
                 return { key, deleted: true, shared };
             }
         };
 
-        // Icone Lucide come componenti React semplici
-        const Star = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
-        const Users = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
-        const Calendar = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
-        const Clock = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
-        const MessageCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
-        const Send = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
-        const Brain = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path></svg>;
-        const MapPin = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>;
-        const Bell = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>;
-        const Zap = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
-        const CheckCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
-        const Languages = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"></path><path d="m4 14 6-6 2-3"></path><path d="M2 5h12"></path><path d="M7 2h1"></path><path d="m22 22-5-10-5 10"></path><path d="M14 18h6"></path></svg>;
-        const RefreshCw = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>;
-        const Trophy = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>;
-        const AlertCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
-        const Eye = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
-        const Sparkles = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>;
-      const translations = {
-          en: {
-            title: "Global Awakening",
-            subtitle: "Unite in Light, Awaken as One",
-            enterPlatform: "Enter Platform",
-            nicknamePrompt: "Choose a nickname (optional)",
-            nicknamePlaceholder: "Leave empty for anonymous...",
-            stats: {
-              activeRituals: "Active Rituals",
-              onlineNow: "Online Now",
-              nextRitual: "Next Ritual"
-            },
-            tabs: {
-              rituals: "Rituals",
-              map: "Map",
-              astral: "Telepathy",
-              community: "Community",
-              chat: "Chat"
-            },
-            profile: {
-              anonymous: "Anonymous",
-              nickname: "Nickname",
-              location: "Location (optional)",
-              hideLocation: "Hide my location",
-              type: "Starseed Type",
-              telepathyScore: "Telepathy Score",
-              saveChanges: "Save",
-              yourProfile: "Your Profile"
-            },
-            map: {
-              title: "Global Starseed Network",
-              subtitle: "Anonymous stars awakening together",
-              totalVisible: "visible starseeds"
-            },
-            astral: {
-              title: "Telepathy Training",
-              subtitle: "Develop your psychic abilities",
-              symbolMatch: {
-                title: "Symbol Telepathy",
-                description: "Practice telepathy with another starseed. One sends, one receives.",
-                yourScore: "Your Score",
-                bestScore: "Best Score",
-                waitingForPartner: "Waiting for partner...",
-                partnerFound: "Partner found!",
-                findPartner: "Find Partner",
-                cancelSearch: "Cancel",
-                instructions: "Instructions",
-                step1: "Click 'Find Partner' to connect with another starseed",
-                step2: "One becomes SENDER (chooses symbol), one becomes RECEIVER (perceives it)",
-                step3: "Compare results - each match earns you both points!",
-                selectSymbol: "SENDER: Select the symbol you're transmitting",
-                receiveSymbol: "RECEIVER: Which symbol do you perceive?",
-                transmitting: "Transmitting...",
-                receiving: "Receiving...",
-                sendButton: "Send Telepathically",
-                receiveButton: "Submit Perception",
-                waitingForSender: "Waiting for sender to choose...",
-                waitingForReceiver: "Waiting for receiver to respond...",
-                match: "✨ TELEPATHIC MATCH! ✨",
-                noMatch: "Keep practicing! You'll improve.",
-                youSent: "Sent",
-                partnerSent: "Partner sent",
-                youReceived: "Received",
-                partnerReceived: "Partner received",
-                tryAgain: "Try Again",
-                newPartner: "Find New Partner",
-                chooseRole: "Choose your role",
-                sender: "I am SENDER",
-                receiver: "I am RECEIVER",
-                bothEarned: "You both earned",
-                points: "points"
-              },
-              groupMind: {
-                title: "Group Mind",
-                description: "Share thoughts with the collective consciousness",
-                participants: "participants",
-                share: "Share Thought",
-                placeholder: "What are you perceiving..."
-              },
-              dreamLink: {
-                title: "Dream Link",
-                description: "Share astral experiences",
-                intention: "Tonight I intend to meet fellow starseeds in the astral realm",
-                share: "Share Dream",
-                placeholder: "Describe your astral experience...",
-                recent: "Recent Dreams"
-              }
-            },
-            chat: {
-              title: "Global Chat",
-              subtitle: "Connect with starseeds worldwide",
-              placeholder: "Share your message with the community...",
-              send: "Send",
-              online: "online now",
-              noMessages: "No messages yet. Be the first to say something!",
-              startChat: "Start a conversation with the community..."
-            },
-            community: {
-              title: "Community",
-              online: "starseeds present"
-            },
-            ritualTypes: {
-              consciousness: { label: "Consciousness", icon: "🧠" },
-              dna: { label: "DNA", icon: "🧬" },
-              lightbody: { label: "Light Body", icon: "✨" },
-              veil: { label: "Veil", icon: "🌟" },
-              unity: { label: "Unity", icon: "🤝" },
-              ascension: { label: "Ascension", icon: "🌅" }
-            },
-            createRitual: {
-              button: "Propose Ritual",
-              title: "Propose Ritual",
-              titlePlaceholder: "Ritual title...",
-              descriptionPlaceholder: "Description...",
-              dateLabel: "Date",
-              timeLabel: "Time (UTC)",
-              durationLabel: "Min",
-              createButton: "Create",
-              cancelButton: "Cancel"
-            },
-            numerology: {
-              1: "Unity", 3: "Trinity", 7: "Mystic", 9: "Complete",
-              11: "Master", 12: "Cosmic", 22: "Builder", 33: "Teacher",
-              44: "Healer", 108: "Sacred"
-            },
-            ritualCard: {
-              by: "by",
-              participants: "joined",
-              timeUntil: "in",
-              join: "Join",
-              joined: "Joined",
-              energy: "Energy",
-              live: "Live",
-              ended: "Ended"
-            }
-          },
-          it: {
-            title: "Risveglio Globale",
-            subtitle: "Uniti nella Luce, Risvegliati come Uno",
-            enterPlatform: "Entra",
-            nicknamePrompt: "Scegli un nickname (opzionale)",
-            nicknamePlaceholder: "Lascia vuoto per anonimo...",
-            stats: {
-              activeRituals: "Rituali Attivi",
-              onlineNow: "Online Ora",
-              nextRitual: "Prossimo"
-            },
-            tabs: {
-              rituals: "Rituali",
-              map: "Mappa",
-              astral: "Telepatia",
-              community: "Community",
-              chat: "Chat"
-            },
-            profile: {
-              anonymous: "Anonimo",
-              nickname: "Nickname",
-              location: "Posizione (opzionale)",
-              hideLocation: "Nascondi posizione",
-              type: "Tipo",
-              telepathyScore: "Punteggio Telepatico",
-              saveChanges: "Salva",
-              yourProfile: "Tuo Profilo"
-            },
-            map: {
-              title: "Rete Globale",
-              subtitle: "Stelle anonime che si risvegliano",
-              totalVisible: "starseeds visibili"
-            },
-            astral: {
-              title: "Allenamento Telepatico",
-              subtitle: "Sviluppa le tue capacità psichiche",
-              symbolMatch: {
-                title: "Telepatia con Simboli",
-                description: "Pratica la telepatia con un altro starseed. Uno trasmette, uno riceve.",
-                yourScore: "Tuo Punteggio",
-                bestScore: "Record",
-                waitingForPartner: "Cercando partner...",
-                partnerFound: "Partner trovato!",
-                findPartner: "Trova Partner",
-                cancelSearch: "Annulla",
-                instructions: "Istruzioni",
-                step1: "Clicca 'Trova Partner' per connetterti con un altro starseed",
-                step2: "Uno diventa TRASMETTITORE (sceglie simbolo), uno RICEVITORE (lo percepisce)",
-                step3: "Confrontate i risultati - ogni match vi fa guadagnare punti!",
-                selectSymbol: "TRASMETTITORE: Seleziona il simbolo che stai trasmettendo",
-                receiveSymbol: "RICEVITORE: Quale simbolo percepisci?",
-                transmitting: "Trasmettendo...",
-                receiving: "Ricevendo...",
-                sendButton: "Trasmetti Telepaticamente",
-                receiveButton: "Invia Percezione",
-                waitingForSender: "Aspettando che il trasmettitore scelga...",
-                waitingForReceiver: "Aspettando la risposta del ricevitore...",
-                match: "✨ MATCH TELEPATICO! ✨",
-                noMatch: "Continua a praticare! Migliorerai.",
-                youSent: "Inviato",
-                partnerSent: "Partner ha inviato",
-                youReceived: "Ricevuto",
-                partnerReceived: "Partner ha ricevuto",
-                tryAgain: "Riprova",
-                newPartner: "Trova Nuovo Partner",
-                chooseRole: "Scegli il tuo ruolo",
-                sender: "Sono TRASMETTITORE",
-                receiver: "Sono RICEVITORE",
-                bothEarned: "Avete guadagnato",
-                points: "punti"
-              },
-              groupMind: {
-                title: "Mente Collettiva",
-                description: "Condividi pensieri con la coscienza collettiva",
-                participants: "partecipanti",
-                share: "Condividi",
-                placeholder: "Cosa stai percependo..."
-              },
-              dreamLink: {
-                title: "Link dei Sogni",
-                description: "Condividi esperienze astrali",
-                intention: "Stanotte intendo incontrare altri starseeds nel regno astrale",
-                share: "Condividi",
-                placeholder: "Descrivi la tua esperienza...",
-                recent: "Sogni Recenti"
-              }
-            },
-            chat: {
-              title: "Chat Globale",
-              subtitle: "Connettiti con starseeds in tutto il mondo",
-              placeholder: "Condividi il tuo messaggio con la community...",
-              send: "Invia",
-              online: "online ora",
-              noMessages: "Nessun messaggio ancora. Sii il primo a dire qualcosa!",
-              startChat: "Inizia una conversazione con la community..."
-            },
-            community: {
-              title: "Community",
-              online: "starseeds presenti"
-            },
-            ritualTypes: {
-              consciousness: { label: "Coscienza", icon: "🧠" },
-              dna: { label: "DNA", icon: "🧬" },
-              lightbody: { label: "Luce", icon: "✨" },
-              veil: { label: "Velo", icon: "🌟" },
-              unity: { label: "Unità", icon: "🤝" },
-              ascension: { label: "Ascensione", icon: "🌅" }
-            },
-            createRitual: {
-              button: "Proponi Rituale",
-              title: "Proponi Rituale",
-              titlePlaceholder: "Titolo rituale...",
-              descriptionPlaceholder: "Descrizione...",
-              dateLabel: "Data",
-              timeLabel: "Ora (UTC)",
-              durationLabel: "Min",
-              createButton: "Crea",
-              cancelButton: "Annulla"
-            },
-            numerology: {
-              1: "Unità", 3: "Trinità", 7: "Mistico", 9: "Completo",
-              11: "Maestro", 12: "Cosmico", 22: "Costruttore", 33: "Insegnante",
-              44: "Guaritore", 108: "Sacro"
-            },
-            ritualCard: {
-              by: "di",
-              participants: "uniti",
-              timeUntil: "tra",
-              join: "Unisciti",
-              joined: "Unito",
-              energy: "Energia",
-              live: "Live",
-              ended: "Finito"
-            }
-          }
-        };
+        window.storage = storage;
+
+        const Star = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
+        const Brain = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path></svg>;
+        const Send = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
+        const Calendar = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+        const MapPin = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>;
+        const Users = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
 
         const telepathySymbols = [
           { id: 'star', icon: '⭐', name: 'Star' },
@@ -335,278 +315,377 @@
           { id: 'eye', icon: '👁️', name: 'Eye' },
           { id: 'infinity', icon: '∞', name: 'Infinity' }
         ];
-      function GlobalAwakeningPlatform() {
+
+        const ritualTypes = [
+          { id: 'consciousness', name: 'Consciousness Elevation', icon: '🧠' },
+          { id: 'dna', name: 'DNA Activation', icon: '🧬' },
+          { id: 'lightbody', name: 'Light Body Activation', icon: '✨' },
+          { id: 'unity', name: 'Unity Consciousness', icon: '🤝' },
+          { id: 'ascension', name: 'Ascension Portal', icon: '🌅' }
+        ];
+
+        const sacredNumbers = [1, 3, 7, 9, 11, 22, 33, 44, 108];
+
+        const translations = {
+          en: {
+            title: "Global Awakening",
+            subtitle: "Unite in Light, Awaken as One",
+            enterPlatform: "Enter Platform",
+            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map", community: "Community" },
+            rituals: {
+              title: "Global Rituals",
+              subtitle: "Synchronized awakening ceremonies",
+              createRitual: "Propose Ritual",
+              noRituals: "No rituals yet. Be the first to propose one!",
+              participants: "participants",
+              startsIn: "Starts in",
+              live: "LIVE NOW",
+              ended: "Ended",
+              join: "Join",
+              joined: "Joined",
+              sendEnergy: "Send Energy",
+              modalTitle: "Create Ritual",
+              ritualName: "Ritual Name",
+              description: "Description",
+              type: "Type",
+              sacredNumber: "Sacred Number",
+              date: "Date",
+              time: "Time (UTC)",
+              duration: "Duration (minutes)",
+              create: "Create Ritual",
+              cancel: "Cancel"
+            },
+            map: {
+              title: "Global Network",
+              subtitle: "Starseeds awakening together",
+              visible: "visible starseeds"
+            }
+          },
+          it: {
+            title: "Risveglio Globale",
+            subtitle: "Uniti nella Luce, Risvegliati come Uno",
+            enterPlatform: "Entra",
+            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa", community: "Community" },
+            rituals: {
+              title: "Rituali Globali",
+              subtitle: "Cerimonie di risveglio sincronizzate",
+              createRitual: "Proponi Rituale",
+              noRituals: "Nessun rituale ancora. Sii il primo a proporne uno!",
+              participants: "partecipanti",
+              startsIn: "Inizia tra",
+              live: "IN DIRETTA",
+              ended: "Terminato",
+              join: "Unisciti",
+              joined: "Unito",
+              sendEnergy: "Invia Energia",
+              modalTitle: "Crea Rituale",
+              ritualName: "Nome Rituale",
+              description: "Descrizione",
+              type: "Tipo",
+              sacredNumber: "Numero Sacro",
+              date: "Data",
+              time: "Ora (UTC)",
+              duration: "Durata (minuti)",
+              create: "Crea Rituale",
+              cancel: "Annulla"
+            },
+            map: {
+              title: "Rete Globale",
+              subtitle: "Starseeds che si risvegliano insieme",
+              visible: "starseeds visibili"
+            }
+          }
+        };
+
+        function GlobalAwakeningPlatform() {
           const [lang, setLang] = useState('en');
           const [activeTab, setActiveTab] = useState('rituals');
-          const [rituals, setRituals] = useState([]);
-          const [onlineUsers, setOnlineUsers] = useState([]);
           const [nickname, setNickname] = useState('');
           const [tempNickname, setTempNickname] = useState('');
           const [showNicknamePrompt, setShowNicknamePrompt] = useState(true);
-          const [country, setCountry] = useState('');
-          const [city, setCity] = useState('');
-          const [hideLocation, setHideLocation] = useState(true);
-          const [starseedType, setStarseedType] = useState('Unknown');
-          const [showCreateRitual, setShowCreateRitual] = useState(false);
-          const [showProfileEdit, setShowProfileEdit] = useState(false);
+          const [onlineUsers, setOnlineUsers] = useState([]);
           
           const [telepathyScore, setTelepathyScore] = useState(0);
           const [bestScore, setBestScore] = useState(0);
+          const [searchingPartner, setSearchingPartner] = useState(false);
+          const [partner, setPartner] = useState(null);
+          const [role, setRole] = useState(null);
+          const [selectedSymbol, setSelectedSymbol] = useState(null);
+          const [guessedSymbol, setGuessedSymbol] = useState(null);
+          const [waitingForPartner, setWaitingForPartner] = useState(false);
+          const [showResult, setShowResult] = useState(false);
+          const [isMatch, setIsMatch] = useState(false);
           
           const [chatMessages, setChatMessages] = useState([]);
-          const [newChatMessage, setNewChatMessage] = useState('');
-          const [telepathicMessage, setTelepathicMessage] = useState('');
-          const [groupThoughts, setGroupThoughts] = useState([]);
-          const [dreamLog, setDreamLog] = useState([]);
-          const [newDream, setNewDream] = useState('');
+          const [newMessage, setNewMessage] = useState('');
           
+          const [rituals, setRituals] = useState([]);
+          const [showCreateRitual, setShowCreateRitual] = useState(false);
           const [newRitual, setNewRitual] = useState({
-            title: '',
+            name: '',
             description: '',
+            type: 'consciousness',
+            sacredNumber: 11,
             date: '',
             time: '',
-            duration: 30,
-            type: 'consciousness',
-            sacredNumber: 11
+            duration: 30
           });
-
+          
+          const sessionId = useRef(Date.now() + '-' + Math.random());
           const t = translations[lang];
-          const sessionId = useRef(Date.now() + Math.random());
 
           useEffect(() => {
+            const score = localStorage.getItem('telepathy_score');
+            const best = localStorage.getItem('telepathy_best');
+            if (score) setTelepathyScore(parseInt(score));
+            if (best) setBestScore(parseInt(best));
+          }, []);
+
+          useEffect(() => {
+            if (!nickname && !tempNickname) return;
+            
+            const updatePresence = async () => {
+              const lat = 20 + Math.random() * 50;
+              const lng = -120 + Math.random() * 200;
+              
+              const presence = {
+                id: sessionId.current,
+                nickname: nickname || 'Anonymous',
+                lat,
+                lng,
+                lastSeen: Date.now()
+              };
+              
+              try {
+                const data = await storage.get('online_users', true);
+                let users = data ? JSON.parse(data.value) : [];
+                users = users.filter(u => Date.now() - u.lastSeen < 60000);
+                const idx = users.findIndex(u => u.id === sessionId.current);
+                if (idx >= 0) users[idx] = presence;
+                else users.push(presence);
+                await storage.set('online_users', JSON.stringify(users), true);
+                setOnlineUsers(users);
+              } catch (e) {}
+            };
+
+            updatePresence();
+            const interval = setInterval(updatePresence, 10000);
+            return () => clearInterval(interval);
+          }, [nickname, tempNickname]);
+
+          useEffect(() => {
+            const loadData = async () => {
+              try {
+                const data = await storage.get('global_chat', true);
+                if (data) setChatMessages(JSON.parse(data.value));
+              } catch (e) {}
+              
+              try {
+                const data = await storage.get('global_rituals', true);
+                if (data) setRituals(JSON.parse(data.value));
+              } catch (e) {}
+            };
             loadData();
             const interval = setInterval(loadData, 3000);
             return () => clearInterval(interval);
           }, []);
 
           useEffect(() => {
-            const loadProfile = async () => {
-              try {
-                const profileData = await window.storage.get('user_profile');
-                if (profileData) {
-                  const profile = JSON.parse(profileData.value);
-                  setNickname(profile.nickname || '');
-                  setStarseedType(profile.starseedType || 'Unknown');
-                  setCountry(profile.country || '');
-                  setCity(profile.city || '');
-                  setHideLocation(profile.hideLocation !== false);
-                  setTelepathyScore(profile.telepathyScore || 0);
-                  setBestScore(profile.bestScore || 0);
-                }
-              } catch (error) {}
-              
-              const savedScore = localStorage.getItem('telepathy_score');
-              const savedBest = localStorage.getItem('telepathy_best');
-              if (savedScore && !nickname) setTelepathyScore(parseInt(savedScore));
-              if (savedBest && !nickname) setBestScore(parseInt(savedBest));
-            };
-            
-            loadProfile();
-          }, []);
+            if (!searchingPartner) return;
 
-          useEffect(() => {
-            const updatePresence = async () => {
-              const presence = {
-                id: sessionId.current,
-                nickname: nickname || t.profile.anonymous,
-                type: starseedType,
-                country: hideLocation ? '' : country,
-                city: hideLocation ? '' : city,
-                lastSeen: Date.now()
-              };
-              
+            const findPartner = async () => {
               try {
-                const presenceData = await window.storage.get('online_presence', true);
-                let allPresence = presenceData ? JSON.parse(presenceData.value) : [];
-                allPresence = allPresence.filter(p => Date.now() - p.lastSeen < 120000);
+                const data = await storage.get('telepathy_queue', true);
+                let queue = data ? JSON.parse(data.value) : [];
+                queue = queue.filter(q => Date.now() - q.timestamp < 60000);
+                queue = queue.filter(q => q.id !== sessionId.current);
                 
-                const index = allPresence.findIndex(p => p.id === sessionId.current);
-                if (index >= 0) {
-                  allPresence[index] = presence;
+                const available = queue.find(q => q.id !== sessionId.current);
+                if (available) {
+                  setPartner(available);
+                  setRole(Math.random() > 0.5 ? 'sender' : 'receiver');
+                  setSearchingPartner(false);
+                  queue = queue.filter(q => q.id !== available.id);
+                  await storage.set('telepathy_queue', JSON.stringify(queue), true);
                 } else {
-                  allPresence.push(presence);
+                  queue.push({
+                    id: sessionId.current,
+                    nickname: nickname || 'Anonymous',
+                    timestamp: Date.now()
+                  });
+                  await storage.set('telepathy_queue', JSON.stringify(queue), true);
                 }
-                
-                await window.storage.set('online_presence', JSON.stringify(allPresence), true);
-                setOnlineUsers(allPresence);
-              } catch (error) {}
+              } catch (e) {}
             };
 
-            updatePresence();
-            const presenceInterval = setInterval(updatePresence, 10000);
-            return () => clearInterval(presenceInterval);
-          }, [nickname, starseedType, country, city, hideLocation, t.profile.anonymous]);
-
-          const loadData = async () => {
-            try {
-              const ritualsData = await window.storage.get('awakening_rituals', true);
-              if (ritualsData) setRituals(JSON.parse(ritualsData.value));
-            } catch (error) {}
-
-            try {
-              const thoughtsData = await window.storage.get('group_thoughts', true);
-              if (thoughtsData) setGroupThoughts(JSON.parse(thoughtsData.value));
-            } catch (error) {}
-
-            try {
-              const dreamsData = await window.storage.get('dream_logs', true);
-              if (dreamsData) setDreamLog(JSON.parse(dreamsData.value));
-            } catch (error) {}
-
-            try {
-              const chatData = await window.storage.get('global_chat', true);
-              if (chatData) setChatMessages(JSON.parse(chatData.value));
-            } catch (error) {}
-
-            try {
-              const presenceData = await window.storage.get('online_presence', true);
-              if (presenceData) {
-                let allPresence = JSON.parse(presenceData.value);
-                allPresence = allPresence.filter(p => Date.now() - p.lastSeen < 120000);
-                setOnlineUsers(allPresence);
-                await window.storage.set('online_presence', JSON.stringify(allPresence), true);
-              }
-            } catch (error) {}
-          };
+            findPartner();
+            const interval = setInterval(findPartner, 2000);
+            return () => clearInterval(interval);
+          }, [searchingPartner, nickname]);
 
           const handleEnter = () => {
-            setNickname(tempNickname || '');
+            setNickname(tempNickname || 'Anonymous');
             setShowNicknamePrompt(false);
           };
 
-          const handleCreateRitual = async () => {
-            if (newRitual.title && newRitual.date && newRitual.time) {
-              const ritual = {
-                id: Date.now(),
-                proposer: nickname || t.profile.anonymous,
-                proposerType: starseedType,
-                ...newRitual,
-                participants: [],
-                energy: 0,
-                createdAt: new Date().toISOString()
-              };
-
-              const updatedRituals = [...rituals, ritual];
-              setRituals(updatedRituals);
-              await window.storage.set('awakening_rituals', JSON.stringify(updatedRituals), true);
-              
-              setNewRitual({
-                title: '',
-                description: '',
-                date: '',
-                time: '',
-                duration: 30,
-                type: 'consciousness',
-                sacredNumber: 11
-              });
-              setShowCreateRitual(false);
-            }
+          const startSearching = () => {
+            setSearchingPartner(true);
+            setPartner(null);
+            setRole(null);
+            setSelectedSymbol(null);
+            setGuessedSymbol(null);
+            setShowResult(false);
           };
 
-          const handleJoinRitual = async (ritualId) => {
-            const updatedRituals = rituals.map(ritual => {
-              if (ritual.id === ritualId) {
-                const alreadyJoined = ritual.participants.some(p => p.id === sessionId.current);
-                if (!alreadyJoined) {
-                  return {
-                    ...ritual,
-                    participants: [...ritual.participants, { 
-                      id: sessionId.current, 
-                      nickname: nickname || t.profile.anonymous, 
-                      type: starseedType 
-                    }],
-                    energy: ritual.energy + 1
-                  };
+          const sendSymbol = () => {
+            if (!selectedSymbol) return;
+            setWaitingForPartner(true);
+            
+            setTimeout(() => {
+              const partnerGuess = telepathySymbols[Math.floor(Math.random() * telepathySymbols.length)].id;
+              const match = partnerGuess === selectedSymbol;
+              setIsMatch(match);
+              setShowResult(true);
+              setWaitingForPartner(false);
+              
+              if (match) {
+                const newScore = telepathyScore + 10;
+                setTelepathyScore(newScore);
+                localStorage.setItem('telepathy_score', newScore);
+                if (newScore > bestScore) {
+                  setBestScore(newScore);
+                  localStorage.setItem('telepathy_best', newScore);
                 }
               }
-              return ritual;
-            });
+            }, 2000);
+          };
+
+          const submitGuess = () => {
+            if (!guessedSymbol) return;
+            setWaitingForPartner(true);
             
-            setRituals(updatedRituals);
-            await window.storage.set('awakening_rituals', JSON.stringify(updatedRituals), true);
+            setTimeout(() => {
+              const senderSymbol = telepathySymbols[Math.floor(Math.random() * telepathySymbols.length)].id;
+              const match = guessedSymbol === senderSymbol;
+              setIsMatch(match);
+              setShowResult(true);
+              setWaitingForPartner(false);
+              
+              if (match) {
+                const newScore = telepathyScore + 10;
+                setTelepathyScore(newScore);
+                localStorage.setItem('telepathy_score', newScore);
+                if (newScore > bestScore) {
+                  setBestScore(newScore);
+                  localStorage.setItem('telepathy_best', newScore);
+                }
+              }
+            }, 2000);
           };
 
-          const handleSendEnergy = async (ritualId) => {
-            const updatedRituals = rituals.map(ritual => 
-              ritual.id === ritualId ? { ...ritual, energy: ritual.energy + 10 } : ritual
-            );
-            setRituals(updatedRituals);
-            await window.storage.set('awakening_rituals', JSON.stringify(updatedRituals), true);
+          const resetTelepathy = () => {
+            setPartner(null);
+            setRole(null);
+            setSelectedSymbol(null);
+            setGuessedSymbol(null);
+            setShowResult(false);
+            setWaitingForPartner(false);
           };
 
-          const handleSendChatMessage = async () => {
-            if (newChatMessage.trim()) {
-              const message = {
-                id: Date.now(),
-                user: nickname || t.profile.anonymous,
-                type: starseedType,
-                sessionId: sessionId.current,
-                content: newChatMessage,
-                timestamp: new Date().toISOString()
-              };
-              const updated = [...chatMessages, message].slice(-100);
-              setChatMessages(updated);
-              await window.storage.set('global_chat', JSON.stringify(updated), true);
-              setNewChatMessage('');
-            }
+          const sendChatMessage = async () => {
+            if (!newMessage.trim()) return;
+            
+            const message = {
+              id: Date.now(),
+              user: nickname || 'Anonymous',
+              content: newMessage,
+              timestamp: new Date().toISOString()
+            };
+            
+            try {
+              const data = await storage.get('global_chat', true);
+              let messages = data ? JSON.parse(data.value) : [];
+              messages.push(message);
+              messages = messages.slice(-50);
+              await storage.set('global_chat', JSON.stringify(messages), true);
+              setChatMessages(messages);
+              setNewMessage('');
+            } catch (e) {}
           };
 
-          const handleShareThought = async () => {
-            if (telepathicMessage.trim()) {
-              const thought = {
-                id: Date.now(),
-                user: nickname || t.profile.anonymous,
-                type: starseedType,
-                message: telepathicMessage,
-                timestamp: new Date().toISOString()
-              };
-              const updated = [thought, ...groupThoughts].slice(0, 20);
-              setGroupThoughts(updated);
-              await window.storage.set('group_thoughts', JSON.stringify(updated), true);
-              setTelepathicMessage('');
-            }
+          const createRitual = async () => {
+            if (!newRitual.name || !newRitual.date || !newRitual.time) return;
+            
+            const ritual = {
+              id: Date.now(),
+              creator: nickname || 'Anonymous',
+              creatorId: sessionId.current,
+              ...newRitual,
+              participants: [sessionId.current],
+              energy: 0,
+              createdAt: Date.now()
+            };
+            
+            try {
+              const data = await storage.get('global_rituals', true);
+              let all = data ? JSON.parse(data.value) : [];
+              all.push(ritual);
+              await storage.set('global_rituals', JSON.stringify(all), true);
+              setRituals(all);
+              setShowCreateRitual(false);
+              setNewRitual({
+                name: '',
+                description: '',
+                type: 'consciousness',
+                sacredNumber: 11,
+                date: '',
+                time: '',
+                duration: 30
+              });
+            } catch (e) {}
           };
 
-          const handleShareDream = async () => {
-            if (newDream.trim()) {
-              const dream = {
-                id: Date.now(),
-                user: nickname || t.profile.anonymous,
-                type: starseedType,
-                content: newDream,
-                timestamp: new Date().toISOString()
-              };
-              const updated = [dream, ...dreamLog].slice(0, 30);
-              setDreamLog(updated);
-              await window.storage.set('dream_logs', JSON.stringify(updated), true);
-              setNewDream('');
-            }
+          const joinRitual = async (ritualId) => {
+            try {
+              const data = await storage.get('global_rituals', true);
+              let all = data ? JSON.parse(data.value) : [];
+              all = all.map(r => {
+                if (r.id === ritualId && !r.participants.includes(sessionId.current)) {
+                  return { ...r, participants: [...r.participants, sessionId.current] };
+                }
+                return r;
+              });
+              await storage.set('global_rituals', JSON.stringify(all), true);
+              setRituals(all);
+            } catch (e) {}
           };
 
-          const starseedTypes = [
-            { name: 'Pleiadian', icon: '✨' },
-            { name: 'Sirian', icon: '🌟' },
-            { name: 'Arcturian', icon: '💫' },
-            { name: 'Andromedan', icon: '🌠' },
-            { name: 'Lyran', icon: '⭐' },
-            { name: 'Orion', icon: '🌌' },
-            { name: 'Unknown', icon: '🌍' }
-          ];
+          const sendEnergy = async (ritualId) => {
+            try {
+              const data = await storage.get('global_rituals', true);
+              let all = data ? JSON.parse(data.value) : [];
+              all = all.map(r => {
+                if (r.id === ritualId) {
+                  return { ...r, energy: r.energy + 10 };
+                }
+                return r;
+              });
+              await storage.set('global_rituals', JSON.stringify(all), true);
+              setRituals(all);
+            } catch (e) {}
+          };
 
-          const sacredNumbers = [1, 3, 7, 9, 11, 12, 22, 33, 44, 108];
-
-          const getTimeUntil = (date, time) => {
-            const ritualDate = new Date(`${date}T${time}`);
+          const getRitualStatus = (ritual) => {
             const now = new Date();
-            const diff = ritualDate - now;
+            const ritualTime = new Date(`${ritual.date}T${ritual.time}Z`);
+            const endTime = new Date(ritualTime.getTime() + ritual.duration * 60000);
             
-            if (diff < 0) {
-              if (diff > -3600000) return t.ritualCard.live;
-              return t.ritualCard.ended;
-            }
+            if (now >= ritualTime && now <= endTime) return 'live';
+            if (now > endTime) return 'ended';
             
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const diff = ritualTime - now;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
             
             if (hours > 0) return `${hours}h ${minutes}m`;
             return `${minutes}m`;
@@ -614,131 +693,462 @@
 
           if (showNicknamePrompt) {
             return (
-              <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center p-4">
+              <div className="min-h-screen bg-gradient flex items-center justify-center p-4">
                 <div className="absolute top-4 right-4">
-                  <button
-                    onClick={() => setLang(lang === 'en' ? 'it' : 'en')}
-                    className="px-4 py-2 bg-white/10 backdrop-blur-lg rounded-xl text-white hover:bg-white/20 transition-all border border-white/20 text-sm"
-                  >
+                  <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary">
                     {lang === 'en' ? 'IT' : 'EN'}
                   </button>
                 </div>
                 
-                <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white/20">
+                <div className="bg-glass rounded-3xl p-8 max-w-md w-full shadow-2xl border-glass">
                   <div className="text-center mb-8">
-                    <Star className="w-24 h-24 mx-auto mb-4 text-yellow-300" style={{animation: 'pulse 2s infinite'}} />
+                    <div style={{fontSize: '4rem'}} className="mb-4 pulse-glow">⭐</div>
                     <h1 className="text-4xl font-bold text-white mb-2">{t.title}</h1>
-                    <p className="text-purple-200 text-sm">{t.subtitle}</p>
+                    <p className="text-secondary text-sm">{t.subtitle}</p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-white mb-2 font-medium text-sm">{t.nicknamePrompt}</label>
-                      <input
-                        type="text"
-                        value={tempNickname}
-                        onChange={(e) => setTempNickname(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleEnter()}
-                        className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        placeholder={t.nicknamePlaceholder}
-                      />
-                    </div>
-                    
-                    <button
-                      onClick={handleEnter}
-                      className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transition-all hover:scale-105"
-                    >
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                    <input
+                      type="text"
+                      value={tempNickname}
+                      onChange={(e) => setTempNickname(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleEnter()}
+                      placeholder="Choose nickname (optional)..."
+                    />
+                    <button onClick={handleEnter} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}}>
                       {t.enterPlatform}
                     </button>
-
-                    <p className="text-purple-300 text-xs text-center">
-                      {lang === 'en' 
-                        ? 'No registration required. Enter and leave freely.' 
-                        : 'Nessuna registrazione richiesta. Entra ed esci liberamente.'}
-                    </p>
                   </div>
                 </div>
               </div>
             );
           }
 
-          return React.createElement('div', { className: 'min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900' },
-            React.createElement('header', { className: 'bg-white/10 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50' },
-              React.createElement('div', { className: 'max-w-7xl mx-auto px-4 py-3' },
-                React.createElement('div', { className: 'flex items-center justify-between' },
-                  React.createElement('div', { className: 'flex items-center gap-3' },
-                    React.createElement(Star, { className: 'w-8 h-8 text-yellow-300' }),
-                    React.createElement('div', null,
-                      React.createElement('h1', { className: 'text-xl font-bold text-white' }, t.title),
-                      React.createElement('p', { className: 'text-purple-200 text-xs' }, t.subtitle)
-                    )
-                  ),
-                  React.createElement('div', { className: 'flex items-center gap-3' },
-                    React.createElement('button', {
-                      onClick: () => setLang(lang === 'en' ? 'it' : 'en'),
-                      className: 'px-3 py-2 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all text-sm'
-                    }, lang === 'en' ? 'IT' : 'EN'),
-                    React.createElement('button', {
-                      onClick: () => setShowProfileEdit(true),
-                      className: 'flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl hover:bg-white/20 transition-all'
-                    },
-                      React.createElement('div', { className: 'text-2xl' }, starseedTypes.find(type => type.name === starseedType)?.icon),
-                      React.createElement('div', { className: 'text-white font-medium text-sm' }, nickname || t.profile.anonymous)
-                    )
-                  )
-                )
-              )
-            ),
-            
-            React.createElement('div', { className: 'max-w-7xl mx-auto px-4 py-3' },
-              React.createElement('div', { className: 'bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-yellow-500/20 backdrop-blur-lg rounded-2xl p-3 border border-white/20' },
-                React.createElement('div', { className: 'grid grid-cols-3 gap-4 text-center' },
-                  React.createElement('div', null,
-                    React.createElement('div', { className: 'text-2xl font-bold text-white' }, rituals.length),
-                    React.createElement('div', { className: 'text-purple-200 text-xs' }, t.stats.activeRituals)
-                  ),
-                  React.createElement('div', null,
-                    React.createElement('div', { className: 'text-2xl font-bold text-white' }, onlineUsers.length),
-                    React.createElement('div', { className: 'text-purple-200 text-xs' }, t.stats.onlineNow)
-                  ),
-                  React.createElement('div', null,
-                    React.createElement('div', { className: 'text-lg font-bold text-yellow-300' }, telepathyScore),
-                    React.createElement('div', { className: 'text-purple-200 text-xs' }, t.profile.telepathyScore)
-                  )
-                )
-              )
-            ),
+          return (
+            <div className="min-h-screen bg-gradient">
+              <header className="sticky top-0 bg-glass border-b z-50">
+                <div className="container">
+                  <div className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3">
+                      <Star style={{width: '2rem', height: '2rem', color: '#fbbf24'}} />
+                      <div>
+                        <h1 className="text-xl font-bold text-white">{t.title}</h1>
+                        <p className="text-primary text-xs">{t.subtitle}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary px-3 py-2">
+                        {lang === 'en' ? 'IT' : 'EN'}
+                      </button>
+                      <div className="text-white font-medium">{nickname}</div>
+                    </div>
+                  </div>
+                </div>
+              </header>
 
-            React.createElement('div', { className: 'max-w-7xl mx-auto px-4 pt-2' },
-              React.createElement('div', { className: 'flex gap-1 bg-white/10 backdrop-blur-lg rounded-2xl p-1 overflow-x-auto' },
-                ['rituals', 'chat', 'community'].map((tab) =>
-                  React.createElement('button', {
-                    key: tab,
-                    onClick: () => setActiveTab(tab),
-                    className: `flex-1 py-2 px-2 rounded-xl font-medium transition-all text-sm whitespace-nowrap ${activeTab === tab ? 'bg-white/20 text-white shadow-lg' : 'text-purple-200 hover:bg-white/10'}`
-                  }, t.tabs[tab])
-                )
-              )
-            ),
+              <div className="container py-3">
+                <div className="bg-glass rounded-2xl p-4 border-glass" style={{background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2), rgba(251, 191, 36, 0.2))'}}>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-white">{rituals.length}</div>
+                      <div className="text-secondary text-xs">Active Rituals</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold" style={{color: '#fbbf24'}}>{telepathyScore}</div>
+                      <div className="text-secondary text-xs">Telepathy Score</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold" style={{color: '#4ade80'}}>{onlineUsers.length}</div>
+                      <div className="text-secondary text-xs">Online Now</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            React.createElement('div', { className: 'max-w-7xl mx-auto px-4 py-4' },
-              activeTab === 'rituals' && React.createElement('div', { className: 'space-y-4' },
-                React.createElement('div', { className: 'bg-white/10 rounded-2xl p-12 text-center' },
-                  React.createElement(Star, { className: 'w-16 h-16 mx-auto mb-4 text-yellow-300' }),
-                  React.createElement('p', { className: 'text-white' }, 'Platform ready! Features coming soon...')
-                )
-              ),
-              activeTab === 'chat' && React.createElement('div', { className: 'bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20' },
-                React.createElement('div', { className: 'p-4 border-b border-white/20' },
-                  React.createElement('h2', { className: 'text-2xl font-bold text-white mb-1' }, t.chat.title),
-                  React.createElement('p', { className: 'text-purple-200 text-sm' }, t.chat.subtitle)
-                )
-              ),
-              activeTab === 'community' && React.createElement('div', { className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20' },
-                React.createElement('h2', { className: 'text-2xl font-bold text-white mb-4' }, t.community.title),
-                React.createElement('div', { className: 'text-purple-200 mb-4' }, `${onlineUsers.length} ${t.community.online}`)
-              )
-            )
+              <div className="container" style={{paddingTop: '0.5rem'}}>
+                <div className="flex gap-2 bg-glass rounded-2xl p-3" style={{overflowX: 'auto'}}>
+                  {['rituals', 'telepathy', 'map', 'chat'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`py-2 px-4 rounded-xl font-medium transition-all ${
+                        activeTab === tab ? 'tab-active' : 'tab-inactive'
+                      }`}
+                      style={{whiteSpace: 'nowrap', flex: '0 0 auto'}}
+                    >
+                      {t.tabs[tab]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="container py-6">
+                {activeTab === 'rituals' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">{t.rituals.title}</h2>
+                        <p className="text-primary">{t.rituals.subtitle}</p>
+                      </div>
+                      <button onClick={() => setShowCreateRitual(true)} className="btn-primary">
+                        {t.rituals.createRitual}
+                      </button>
+                    </div>
+
+                    {rituals.length === 0 && (
+                      <div className="bg-glass rounded-2xl p-12 text-center border-glass">
+                        <div style={{fontSize: '4rem'}} className="mb-4">🌟</div>
+                        <p className="text-white">{t.rituals.noRituals}</p>
+                      </div>
+                    )}
+
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem'}}>
+                      {rituals.map(ritual => {
+                        const status = getRitualStatus(ritual);
+                        const isLive = status === 'live';
+                        const isJoined = ritual.participants.includes(sessionId.current);
+                        
+                        return (
+                          <div key={ritual.id} className={`ritual-card ${isLive ? 'ritual-live' : ''}`}>
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <div style={{fontSize: '2rem'}} className="mb-2">{ritualTypes.find(t => t.id === ritual.type)?.icon}</div>
+                                <h3 className="text-xl font-bold text-white mb-1">{ritual.name}</h3>
+                                <p className="text-secondary text-sm">{ritual.description}</p>
+                              </div>
+                              <div className="text-2xl" style={{color: '#fbbf24'}}>{ritual.sacredNumber}</div>
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-3">
+                              <Calendar style={{width: '1rem', height: '1rem', color: '#a78bfa'}} />
+                              <span className="text-primary text-sm">{ritual.date} {ritual.time} UTC</span>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <Users style={{width: '1rem', height: '1rem', color: '#a78bfa'}} />
+                                <span className="text-white text-sm">{ritual.participants.length} {t.rituals.participants}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm" style={{color: isLive ? '#4ade80' : '#fbbf24'}}>
+                                  {isLive ? t.rituals.live : (status === 'ended' ? t.rituals.ended : `${t.rituals.startsIn} ${status}`)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => joinRitual(ritual.id)}
+                                className={isJoined ? 'btn-secondary flex-1' : 'btn-primary flex-1'}
+                                disabled={isJoined || status === 'ended'}
+                              >
+                                {isJoined ? t.rituals.joined : t.rituals.join}
+                              </button>
+                              {isLive && (
+                                <button onClick={() => sendEnergy(ritual.id)} className="btn-secondary px-4">
+                                  ⚡ {ritual.energy}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'map' && (
+                  <div>
+                    <div className="mb-6">
+                      <h2 className="text-3xl font-bold text-white mb-2">{t.map.title}</h2>
+                      <p className="text-primary">{t.map.subtitle}</p>
+                    </div>
+
+                    <div className="map-container">
+                      <img 
+                        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500'%3E%3Crect fill='%23111827' width='1000' height='500'/%3E%3Cpath fill='%231f2937' d='M0 250 Q 250 200 500 250 T 1000 250 L 1000 500 L 0 500 Z'/%3E%3C/svg%3E"
+                        alt="World map"
+                        style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                      />
+                      {onlineUsers.map(user => {
+                        const x = ((user.lng + 180) / 360) * 100;
+                        const y = ((90 - user.lat) / 180) * 100;
+                        
+                        return (
+                          <React.Fragment key={user.id}>
+                            <div 
+                              className="map-point"
+                              style={{left: `${x}%`, top: `${y}%`}}
+                              title={user.nickname}
+                            />
+                            <div 
+                              className="map-ripple ripple"
+                              style={{left: `${x}%`, top: `${y}%`}}
+                            />
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 text-center">
+                      <span className="text-white text-lg font-bold">{onlineUsers.length}</span>
+                      <span className="text-primary ml-2">{t.map.visible}</span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'telepathy' && (
+                  <div className="bg-glass rounded-2xl p-6 border-glass">
+                    <div className="text-center mb-6">
+                      <Brain style={{width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#a78bfa'}} />
+                      <h2 className="text-3xl font-bold text-white mb-2">Telepathy Training</h2>
+                      <p className="text-primary">Develop your psychic abilities</p>
+                    </div>
+
+                    {!partner && !searchingPartner && (
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                        <div className="bg-glass-dark rounded-xl p-6" style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                          <h3 className="text-white font-bold mb-3">How it works:</h3>
+                          <p className="text-primary text-sm">1. Click 'Find Partner' to connect</p>
+                          <p className="text-primary text-sm">2. One sends a symbol, one receives</p>
+                          <p className="text-primary text-sm">3. Match correctly to earn points!</p>
+                        </div>
+                        <button onClick={startSearching} className="btn-primary w-full" style={{fontSize: '1.125rem'}}>
+                          Find Partner
+                        </button>
+                      </div>
+                    )}
+
+                    {searchingPartner && (
+                      <div className="text-center" style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                        <div style={{fontSize: '4rem'}} className="pulse-glow">🔮</div>
+                        <p className="text-white text-xl">Searching for partner...</p>
+                        <button onClick={() => setSearchingPartner(false)} className="btn-secondary">Cancel</button>
+                      </div>
+                    )}
+
+                    {partner && !showResult && (
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                        <div className="result-success rounded-xl p-4 text-center">
+                          <p style={{color: '#4ade80'}} className="font-bold">✨ Partner found!</p>
+                          <p className="text-white mt-2">Your role: <span className="font-bold">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</span></p>
+                        </div>
+
+                        {role === 'sender' && !waitingForPartner && (
+                          <div>
+                            <p className="text-white text-center mb-4 font-medium">Select a symbol to send:</p>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              {telepathySymbols.map((symbol) => (
+                                <button
+                                  key={symbol.id}
+                                  onClick={() => setSelectedSymbol(symbol.id)}
+                                  className={`symbol-btn ${selectedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}
+                                >
+                                  {symbol.icon}
+                                </button>
+                              ))}
+                            </div>
+                            <button onClick={sendSymbol} disabled={!selectedSymbol} className="btn-primary w-full">
+                              Send Telepathically
+                            </button>
+                          </div>
+                        )}
+
+                        {role === 'receiver' && !waitingForPartner && (
+                          <div>
+                            <p className="text-white text-center mb-4 font-medium">Which symbol do you receive?</p>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              {telepathySymbols.map((symbol) => (
+                                <button
+                                  key={symbol.id}
+                                  onClick={() => setGuessedSymbol(symbol.id)}
+                                  className={`symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}
+                                >
+                                  {symbol.icon}
+                                </button>
+                              ))}
+                            </div>
+                            <button onClick={submitGuess} disabled={!guessedSymbol} className="btn-primary w-full">
+                              Submit
+                            </button>
+                          </div>
+                        )}
+
+                        {waitingForPartner && (
+                          <div className="text-center">
+                            <div style={{fontSize: '4rem'}} className="pulse-glow mb-4">🔮</div>
+                            <p className="text-primary">Processing telepathic transmission...</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {showResult && (
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                        <div className={`${isMatch ? 'result-success' : 'result-try-again'} rounded-xl p-6 text-center`}>
+                          <div style={{fontSize: '4rem'}} className="mb-4">{isMatch ? '✨' : '🌟'}</div>
+                          <h3 className="text-2xl font-bold mb-2" style={{color: isMatch ? '#4ade80' : '#fb923c'}}>
+                            {isMatch ? '✨ TELEPATHIC MATCH! ✨' : 'Not this time. Keep practicing!'}
+                          </h3>
+                          {isMatch && (
+                            <p className="text-white">
+                              You both earned <span className="font-bold" style={{color: '#fbbf24'}}>+10</span> points
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <button onClick={resetTelepathy} className="btn-secondary py-3 font-bold">
+                            Try Again
+                          </button>
+                          <button
+                            onClick={() => {
+                              resetTelepathy();
+                              startSearching();
+                            }}
+                            className="btn-primary"
+                          >
+                            New Partner
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'chat' && (
+                  <div className="bg-glass rounded-2xl border-glass chat-container">
+                    <div className="p-4 border-b">
+                      <h2 className="text-2xl font-bold text-white">Global Chat</h2>
+                      <p className="text-primary text-sm">{onlineUsers.length} starseeds online</p>
+                    </div>
+                    
+                    <div className="chat-messages">
+                      {chatMessages.length === 0 && (
+                        <div className="text-center text-primary py-8">
+                          No messages yet. Start the conversation!
+                        </div>
+                      )}
+                      {chatMessages.map((msg) => (
+                        <div key={msg.id} className="chat-message">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-primary font-medium text-sm">{msg.user}</span>
+                            <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-white">{msg.content}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-4 border-t">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                          placeholder="Share your message..."
+                          style={{flex: 1}}
+                        />
+                        <button onClick={sendChatMessage} className="btn-primary px-6 py-3">
+                          <Send style={{width: '1.25rem', height: '1.25rem'}} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {showCreateRitual && (
+                <div className="modal-overlay" onClick={() => setShowCreateRitual(false)}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <h2 className="text-2xl font-bold text-white mb-6">{t.rituals.modalTitle}</h2>
+                    
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.ritualName}</label>
+                        <input
+                          type="text"
+                          value={newRitual.name}
+                          onChange={(e) => setNewRitual({...newRitual, name: e.target.value})}
+                          placeholder="e.g., Full Moon Meditation"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.description}</label>
+                        <textarea
+                          value={newRitual.description}
+                          onChange={(e) => setNewRitual({...newRitual, description: e.target.value})}
+                          placeholder="Describe the ritual..."
+                          rows="3"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.type}</label>
+                          <select value={newRitual.type} onChange={(e) => setNewRitual({...newRitual, type: e.target.value})}>
+                            {ritualTypes.map(type => (
+                              <option key={type.id} value={type.id}>{type.icon} {type.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.sacredNumber}</label>
+                          <select value={newRitual.sacredNumber} onChange={(e) => setNewRitual({...newRitual, sacredNumber: parseInt(e.target.value)})}>
+                            {sacredNumbers.map(num => (
+                              <option key={num} value={num}>{num}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.date}</label>
+                          <input
+                            type="date"
+                            value={newRitual.date}
+                            onChange={(e) => setNewRitual({...newRitual, date: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.time}</label>
+                          <input
+                            type="time"
+                            value={newRitual.time}
+                            onChange={(e) => setNewRitual({...newRitual, time: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.rituals.duration}</label>
+                        <input
+                          type="number"
+                          value={newRitual.duration}
+                          onChange={(e) => setNewRitual({...newRitual, duration: parseInt(e.target.value)})}
+                          min="5"
+                          max="180"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <button onClick={() => setShowCreateRitual(false)} className="btn-secondary w-full">
+                          {t.rituals.cancel}
+                        </button>
+                        <button onClick={createRitual} className="btn-primary w-full">
+                          {t.rituals.create}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         }
 
