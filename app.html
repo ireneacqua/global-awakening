@@ -505,9 +505,9 @@
         function GlobalAwakeningPlatform() {
           const [lang, setLang] = useState('en');
           const [activeTab, setActiveTab] = useState('rituals');
-          const [nickname, setNickname] = useState('');
+          const [nickname, setNickname] = useState(() => localStorage.getItem('ga_nickname') || '');
           const [tempNickname, setTempNickname] = useState('');
-          const [showNicknamePrompt, setShowNicknamePrompt] = useState(true);
+          const [showNicknamePrompt, setShowNicknamePrompt] = useState(() => !localStorage.getItem('ga_nickname'));
           const [onlineUsers, setOnlineUsers] = useState([]);
           
           const [telepathyScore, setTelepathyScore] = useState(0);
@@ -617,26 +617,57 @@
           }, []);
 
           // Telepathy matching
+          const [queuePosition, setQueuePosition] = useState(0);
+          const [queueSize, setQueueSize] = useState(0);
+
           useEffect(() => {
             if (!searchingPartner) return;
 
             const findPartner = async () => {
               // Clean old entries
               await supabase.from('telepathy_queue').delete().lt('timestamp', Date.now() - 60000);
-              
-              // Get all waiting people
+              await supabase.from('telepathy_matches').delete().lt('created_at', new Date(Date.now() - 300000).toISOString());
+
+              // 1. Check if someone already matched with me
+              const { data: matches } = await supabase.from('telepathy_matches').select('*');
+              if (matches) {
+                const myMatch = matches.find(m => m.user1_id === sessionId.current || m.user2_id === sessionId.current);
+                if (myMatch) {
+                  const amUser1 = myMatch.user1_id === sessionId.current;
+                  setPartner({ id: amUser1 ? myMatch.user2_id : myMatch.user1_id, nickname: amUser1 ? myMatch.user2_nickname : myMatch.user1_nickname });
+                  setRole(amUser1 ? myMatch.user1_role : myMatch.user2_role);
+                  setSearchingPartner(false);
+                  // Remove from queue
+                  await supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
+                  return;
+                }
+              }
+
+              // 2. Look for someone in queue
               const { data: queue } = await supabase.from('telepathy_queue').select('*').neq('id', sessionId.current).order('timestamp', { ascending: true });
-              
+
               if (queue && queue.length > 0) {
-                // Match with first person in queue
                 const available = queue[0];
-                setPartner(available);
-                setRole(Math.random() > 0.5 ? 'sender' : 'receiver');
-                setSearchingPartner(false);
-                
+                const myRole = Math.random() > 0.5 ? 'sender' : 'receiver';
+                const theirRole = myRole === 'sender' ? 'receiver' : 'sender';
+
+                // Create match record so both users can see it
+                await supabase.from('telepathy_matches').insert({
+                  user1_id: available.id,
+                  user1_nickname: available.nickname,
+                  user1_role: theirRole,
+                  user2_id: sessionId.current,
+                  user2_nickname: nickname || 'Anonymous',
+                  user2_role: myRole
+                });
+
                 // Remove both from queue
                 await supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
                 await supabase.from('telepathy_queue').delete().eq('id', available.id);
+
+                setPartner(available);
+                setRole(myRole);
+                setSearchingPartner(false);
               } else {
                 // Add self to queue
                 await supabase.from('telepathy_queue').upsert({
@@ -644,6 +675,14 @@
                   nickname: nickname || 'Anonymous',
                   timestamp: Date.now()
                 });
+
+                // Update queue info
+                const { data: allQueue } = await supabase.from('telepathy_queue').select('*').order('timestamp', { ascending: true });
+                if (allQueue) {
+                  setQueueSize(allQueue.length);
+                  const myPos = allQueue.findIndex(q => q.id === sessionId.current);
+                  setQueuePosition(myPos >= 0 ? myPos + 1 : 0);
+                }
               }
             };
 
@@ -651,36 +690,16 @@
             const interval = setInterval(findPartner, 2000);
             return () => {
               clearInterval(interval);
-              // Remove from queue when stopping search
               if (searchingPartner) {
                 supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
               }
             };
           }, [searchingPartner, nickname]);
-          
-          // Show queue position
-          const [queuePosition, setQueuePosition] = useState(0);
-          const [queueSize, setQueueSize] = useState(0);
-          
-          useEffect(() => {
-            if (!searchingPartner) return;
-            
-            const checkQueue = async () => {
-              const { data: queue } = await supabase.from('telepathy_queue').select('*').order('timestamp', { ascending: true });
-              if (queue) {
-                setQueueSize(queue.length);
-                const myPosition = queue.findIndex(q => q.id === sessionId.current);
-                setQueuePosition(myPosition >= 0 ? myPosition + 1 : 0);
-              }
-            };
-            
-            checkQueue();
-            const interval = setInterval(checkQueue, 1000);
-            return () => clearInterval(interval);
-          }, [searchingPartner]);
 
           const handleEnter = () => {
-            setNickname(tempNickname || 'Anonymous');
+            const name = tempNickname || 'Anonymous';
+            localStorage.setItem('ga_nickname', name);
+            setNickname(name);
             setShowNicknamePrompt(false);
           };
 
