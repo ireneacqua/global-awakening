@@ -7,7 +7,108 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+    // Supabase REST API wrapper
+    const SUPABASE_URL = 'https://zdrmvlxnheymtlnryumy.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpkcm12bHhuaGV5bXRsbnJ5dW15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzIzNDQsImV4cCI6MjA4Njg0ODM0NH0.D-qfbLzcyOYo7lt9ZEuw_lET8BEr28_NNptJ4Vfnn6I';
+    const SB_HEADERS = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    };
+
+    const supabase = {
+      from: (table) => ({
+        _table: table,
+        _filters: [],
+        _order: null,
+        _limit: null,
+
+        select(cols = '*') {
+          const q = { ...this, _select: cols };
+          q.order = function(col, opts) { this._order = { col, ...opts }; return this; };
+          q.limit = function(n) { this._limit = n; return this; };
+          q.eq = function(col, val) { this._filters.push(`${col}=eq.${val}`); return this; };
+          q.neq = function(col, val) { this._filters.push(`${col}=neq.${val}`); return this; };
+          q.lt = function(col, val) { this._filters.push(`${col}=lt.${val}`); return this; };
+          q.then = async function(resolve) {
+            let url = `${SUPABASE_URL}/rest/v1/${this._table}?select=${this._select}`;
+            this._filters.forEach(f => url += '&' + f);
+            if (this._order) url += `&order=${this._order.col}.${this._order.ascending ? 'asc' : 'desc'}`;
+            if (this._limit) url += `&limit=${this._limit}`;
+            try {
+              const res = await fetch(url, { headers: SB_HEADERS });
+              const data = await res.json();
+              if (!res.ok) return resolve({ data: null, error: data });
+              return resolve({ data, error: null });
+            } catch(e) { return resolve({ data: null, error: e }); }
+          };
+          return q;
+        },
+
+        async insert(row) {
+          try {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/${this._table}`, {
+              method: 'POST', headers: SB_HEADERS, body: JSON.stringify(row)
+            });
+            const data = await res.json();
+            if (!res.ok) return { data: null, error: data };
+            return { data, error: null, select() { return { data, error: null }; } };
+          } catch(e) { return { data: null, error: e }; }
+        },
+
+        async upsert(row) {
+          try {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/${this._table}`, {
+              method: 'POST',
+              headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+              body: JSON.stringify(row)
+            });
+            const data = await res.json();
+            if (!res.ok) return { data: null, error: data };
+            return { data, error: null };
+          } catch(e) { return { data: null, error: e }; }
+        },
+
+        update(row) {
+          const ctx = { _table: this._table, _row: row, _filters: [] };
+          ctx.eq = function(col, val) { this._filters.push(`${col}=eq.${val}`); return this; };
+          ctx.then = async function(resolve) {
+            let url = `${SUPABASE_URL}/rest/v1/${this._table}?`;
+            url += this._filters.join('&');
+            try {
+              const res = await fetch(url, {
+                method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(this._row)
+              });
+              const data = await res.json();
+              if (!res.ok) return resolve({ data: null, error: data });
+              return resolve({ data, error: null });
+            } catch(e) { return resolve({ data: null, error: e }); }
+          };
+          return ctx;
+        },
+
+        delete() {
+          const ctx = { _table: this._table, _filters: [] };
+          ctx.eq = function(col, val) { this._filters.push(`${col}=eq.${val}`); return this; };
+          ctx.neq = function(col, val) { this._filters.push(`${col}=neq.${val}`); return this; };
+          ctx.lt = function(col, val) { this._filters.push(`${col}=lt.${val}`); return this; };
+          ctx.then = async function(resolve) {
+            let url = `${SUPABASE_URL}/rest/v1/${this._table}?`;
+            url += this._filters.join('&');
+            try {
+              const res = await fetch(url, { method: 'DELETE', headers: SB_HEADERS });
+              return resolve({ error: null });
+            } catch(e) { return resolve({ error: e }); }
+          };
+          return ctx;
+        }
+      }),
+
+      channel() { return { on() { return this; }, subscribe() { return this; }, unsubscribe() {} }; }
+    };
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
@@ -303,11 +404,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // Initialize Supabase
-        const supabase = window.supabase.createClient(
-            'https://vxzxdkcluyrcftsnxxza.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4enhka2NsdXlyY2Z0c254eHphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg0MTQwOTUsImV4cCI6MjA1Mzk5MDA5NX0.sb_publishable_AzwgfHpTfTDzi5n6fgFUDA_Qba_KX42'
-        );
+        // Supabase is initialized in the script tag above
 
         const Star = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
         const Brain = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path></svg>;
