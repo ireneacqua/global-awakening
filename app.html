@@ -9,8 +9,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script>
     // Supabase REST API wrapper
-    const SUPABASE_URL = 'https://zdrmvlxnheymtlnryumy.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpkcm12bHhuaGV5bXRsbnJ5dW15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzIzNDQsImV4cCI6MjA4Njg0ODM0NH0.D-qfbLzcyOYo7lt9ZEuw_lET8BEr28_NNptJ4Vfnn6I';
+    const SUPABASE_URL = 'https://vxzxdkcluyrcftsnxxza.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4enhka2NsdXlyY2Z0c254eHphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMzcyMTcsImV4cCI6MjA4NjkxMzIxN30.m_mzWHH1-ajVqeSFvuJAm8t5Kz7I7umcEKBrRPr5JXM';
     const SB_HEADERS = {
       'apikey': SUPABASE_KEY,
       'Authorization': 'Bearer ' + SUPABASE_KEY,
@@ -436,7 +436,45 @@
             title: "Global Awakening",
             subtitle: "Unite in Light, Awaken as One",
             enterPlatform: "Enter Platform",
-            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map" },
+            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map", profile: "Profile" },
+            profile: {
+              title: "Your Profile",
+              subtitle: "Tell the community about yourself",
+              bio: "Bio",
+              bioPlaceholder: "Tell us about your spiritual journey...",
+              starseedType: "Starseed Type",
+              avatar: "Avatar",
+              country: "Country",
+              countryPlaceholder: "Your country",
+              interests: "Spiritual Interests",
+              experienceLevel: "Experience Level",
+              save: "Save Profile",
+              saved: "Profile Saved!",
+              starseedTypes: {
+                pleiadian: "Pleiadian",
+                sirian: "Sirian",
+                arcturian: "Arcturian",
+                andromedan: "Andromedan",
+                lyran: "Lyran",
+                orion: "Orion",
+                universal: "Universal"
+              },
+              experienceLevels: {
+                beginner: "Beginner",
+                intermediate: "Intermediate",
+                advanced: "Advanced",
+                master: "Master"
+              },
+              interestsList: {
+                meditation: "Meditation",
+                telepathy: "Telepathy",
+                healing: "Healing",
+                astrology: "Astrology",
+                lucidDreams: "Lucid Dreams",
+                astralProjection: "Astral Projection",
+                channeling: "Channeling"
+              }
+            },
             rituals: {
               title: "Global Rituals",
               subtitle: "Synchronized awakening ceremonies",
@@ -470,7 +508,45 @@
             title: "Risveglio Globale",
             subtitle: "Uniti nella Luce, Risvegliati come Uno",
             enterPlatform: "Entra",
-            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa" },
+            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa", profile: "Profilo" },
+            profile: {
+              title: "Il Tuo Profilo",
+              subtitle: "Racconta alla comunità di te",
+              bio: "Bio",
+              bioPlaceholder: "Raccontaci del tuo percorso spirituale...",
+              starseedType: "Tipo di Starseed",
+              avatar: "Avatar",
+              country: "Paese",
+              countryPlaceholder: "Il tuo paese",
+              interests: "Interessi Spirituali",
+              experienceLevel: "Livello Esperienza",
+              save: "Salva Profilo",
+              saved: "Profilo Salvato!",
+              starseedTypes: {
+                pleiadian: "Pleiadiano",
+                sirian: "Siriano",
+                arcturian: "Arcturiano",
+                andromedan: "Andromedano",
+                lyran: "Lirano",
+                orion: "Orione",
+                universal: "Universale"
+              },
+              experienceLevels: {
+                beginner: "Principiante",
+                intermediate: "Intermedio",
+                advanced: "Avanzato",
+                master: "Maestro"
+              },
+              interestsList: {
+                meditation: "Meditazione",
+                telepathy: "Telepatia",
+                healing: "Guarigione",
+                astrology: "Astrologia",
+                lucidDreams: "Sogni Lucidi",
+                astralProjection: "Proiezione Astrale",
+                channeling: "Canalizzazione"
+              }
+            },
             rituals: {
               title: "Rituali Globali",
               subtitle: "Cerimonie di risveglio sincronizzate",
@@ -520,6 +596,8 @@
           const [waitingForPartner, setWaitingForPartner] = useState(false);
           const [showResult, setShowResult] = useState(false);
           const [isMatch, setIsMatch] = useState(false);
+          const [matchId, setMatchId] = useState(null);
+          const [partnerSymbol, setPartnerSymbol] = useState(null);
           
           const [chatMessages, setChatMessages] = useState([]);
           const [newMessage, setNewMessage] = useState('');
@@ -538,6 +616,21 @@
           
           const sessionId = useRef(Date.now() + '-' + Math.random());
           const t = translations[lang];
+
+          const avatarEmojis = ['🌟', '✨', '🔮', '🧿', '💫', '⭐', '🌙', '☀️', '🌈', '🦋', '🕊️', '🐉', '🧬', '👁️', '💜', '🔥', '🌸', '🍃', '💎', '🪷'];
+          const starseedTypes = ['pleiadian', 'sirian', 'arcturian', 'andromedan', 'lyran', 'orion', 'universal'];
+          const experienceLevels = ['beginner', 'intermediate', 'advanced', 'master'];
+          const interestKeys = ['meditation', 'telepathy', 'healing', 'astrology', 'lucidDreams', 'astralProjection', 'channeling'];
+
+          const [profile, setProfile] = useState({
+            bio: '',
+            starseedType: '',
+            avatar: '',
+            country: '',
+            interests: [],
+            experienceLevel: ''
+          });
+          const [profileSaved, setProfileSaved] = useState(false);
 
           // Load scores
           useEffect(() => {
@@ -636,6 +729,7 @@
                   const amUser1 = myMatch.user1_id === sessionId.current;
                   setPartner({ id: amUser1 ? myMatch.user2_id : myMatch.user1_id, nickname: amUser1 ? myMatch.user2_nickname : myMatch.user1_nickname });
                   setRole(amUser1 ? myMatch.user1_role : myMatch.user2_role);
+                  setMatchId(myMatch.id);
                   setSearchingPartner(false);
                   // Remove from queue
                   await supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
@@ -652,7 +746,7 @@
                 const theirRole = myRole === 'sender' ? 'receiver' : 'sender';
 
                 // Create match record so both users can see it
-                await supabase.from('telepathy_matches').insert({
+                const { data: matchData } = await supabase.from('telepathy_matches').insert({
                   user1_id: available.id,
                   user1_nickname: available.nickname,
                   user1_role: theirRole,
@@ -660,6 +754,10 @@
                   user2_nickname: nickname || 'Anonymous',
                   user2_role: myRole
                 });
+
+                if (matchData && matchData.length > 0) {
+                  setMatchId(matchData[0].id);
+                }
 
                 // Remove both from queue
                 await supabase.from('telepathy_queue').delete().eq('id', sessionId.current);
@@ -712,51 +810,56 @@
             setShowResult(false);
           };
 
-          const sendSymbol = () => {
-            if (!selectedSymbol) return;
+          const sendSymbol = async () => {
+            if (!selectedSymbol || !matchId) return;
             setWaitingForPartner(true);
-            
-            setTimeout(() => {
-              const partnerGuess = telepathySymbols[Math.floor(Math.random() * telepathySymbols.length)].id;
-              const match = partnerGuess === selectedSymbol;
-              setIsMatch(match);
-              setShowResult(true);
-              setWaitingForPartner(false);
-              
-              if (match) {
-                const newScore = telepathyScore + 10;
-                setTelepathyScore(newScore);
-                localStorage.setItem('telepathy_score', newScore);
-                if (newScore > bestScore) {
-                  setBestScore(newScore);
-                  localStorage.setItem('telepathy_best', newScore);
-                }
-              }
-            }, 2000);
+
+            await supabase.from('telepathy_matches').update({
+              sender_symbol: selectedSymbol
+            }).eq('id', matchId);
           };
 
-          const submitGuess = () => {
-            if (!guessedSymbol) return;
+          const submitGuess = async () => {
+            if (!guessedSymbol || !matchId) return;
             setWaitingForPartner(true);
-            
-            setTimeout(() => {
-              const senderSymbol = telepathySymbols[Math.floor(Math.random() * telepathySymbols.length)].id;
-              const match = guessedSymbol === senderSymbol;
-              setIsMatch(match);
-              setShowResult(true);
-              setWaitingForPartner(false);
-              
-              if (match) {
-                const newScore = telepathyScore + 10;
-                setTelepathyScore(newScore);
-                localStorage.setItem('telepathy_score', newScore);
-                if (newScore > bestScore) {
-                  setBestScore(newScore);
-                  localStorage.setItem('telepathy_best', newScore);
+
+            await supabase.from('telepathy_matches').update({
+              receiver_guess: guessedSymbol
+            }).eq('id', matchId);
+          };
+
+          // Poll for telepathy result when waiting
+          useEffect(() => {
+            if (!matchId || !waitingForPartner) return;
+
+            const pollResult = async () => {
+              const { data } = await supabase.from('telepathy_matches').select('*').eq('id', matchId);
+              if (!data || data.length === 0) return;
+              const match = data[0];
+
+              if (match.sender_symbol && match.receiver_guess) {
+                const isTelepathicMatch = match.sender_symbol === match.receiver_guess;
+                setPartnerSymbol(role === 'sender' ? match.receiver_guess : match.sender_symbol);
+                setIsMatch(isTelepathicMatch);
+                setShowResult(true);
+                setWaitingForPartner(false);
+
+                if (isTelepathicMatch) {
+                  const newScore = telepathyScore + 10;
+                  setTelepathyScore(newScore);
+                  localStorage.setItem('telepathy_score', newScore);
+                  if (newScore > bestScore) {
+                    setBestScore(newScore);
+                    localStorage.setItem('telepathy_best', newScore);
+                  }
                 }
               }
-            }, 2000);
-          };
+            };
+
+            pollResult();
+            const interval = setInterval(pollResult, 2000);
+            return () => clearInterval(interval);
+          }, [matchId, waitingForPartner, role, telepathyScore, bestScore]);
 
           const resetTelepathy = () => {
             setPartner(null);
@@ -765,6 +868,69 @@
             setGuessedSymbol(null);
             setShowResult(false);
             setWaitingForPartner(false);
+            setMatchId(null);
+            setPartnerSymbol(null);
+          };
+
+          // Load profile from Supabase or localStorage
+          useEffect(() => {
+            const loadProfile = async () => {
+              try {
+                const { data } = await supabase.from('profiles').select('*').eq('session_id', sessionId.current);
+                if (data && data.length > 0) {
+                  const p = data[0];
+                  const loaded = {
+                    bio: p.bio || '',
+                    starseedType: p.starseed_type || '',
+                    avatar: p.avatar || '',
+                    country: p.country || '',
+                    interests: p.interests || [],
+                    experienceLevel: p.experience_level || ''
+                  };
+                  setProfile(loaded);
+                  localStorage.setItem('ga_profile', JSON.stringify(loaded));
+                  return;
+                }
+              } catch (err) {
+                console.warn('Failed to load profile from Supabase:', err);
+              }
+              // Fallback to localStorage
+              const local = localStorage.getItem('ga_profile');
+              if (local) {
+                try { setProfile(JSON.parse(local)); } catch(e) {}
+              }
+            };
+            loadProfile();
+          }, []);
+
+          const saveProfile = async () => {
+            const row = {
+              session_id: sessionId.current,
+              nickname: nickname || 'Anonymous',
+              bio: profile.bio,
+              starseed_type: profile.starseedType,
+              avatar: profile.avatar,
+              country: profile.country,
+              interests: profile.interests,
+              experience_level: profile.experienceLevel
+            };
+            try {
+              await supabase.from('profiles').upsert(row);
+            } catch (err) {
+              console.warn('Failed to save profile to Supabase:', err);
+            }
+            localStorage.setItem('ga_profile', JSON.stringify(profile));
+            setProfileSaved(true);
+            setTimeout(() => setProfileSaved(false), 3000);
+          };
+
+          const toggleInterest = (key) => {
+            setProfile(prev => ({
+              ...prev,
+              interests: prev.interests.includes(key)
+                ? prev.interests.filter(i => i !== key)
+                : [...prev.interests, key]
+            }));
           };
 
           const sendChatMessage = async () => {
@@ -908,7 +1074,7 @@
                       <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary px-3 py-2">
                         {lang === 'en' ? 'IT' : 'EN'}
                       </button>
-                      <div className="text-white font-medium">{nickname}</div>
+                      <div className="text-white font-medium">{profile.avatar && <span style={{marginRight: '0.25rem'}}>{profile.avatar}</span>}{nickname}</div>
                     </div>
                   </div>
                 </div>
@@ -935,7 +1101,7 @@
 
               <div className="container" style={{paddingTop: '0.5rem'}}>
                 <div className="flex gap-2 bg-glass rounded-2xl p-3" style={{overflowX: 'auto'}}>
-                  {['rituals', 'telepathy', 'map', 'chat'].map((tab) => (
+                  {['rituals', 'telepathy', 'map', 'chat', 'profile'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -1154,7 +1320,9 @@
                         {waitingForPartner && (
                           <div className="text-center">
                             <div style={{fontSize: '4rem'}} className="pulse-glow mb-4">🔮</div>
-                            <p className="text-primary">Processing telepathic transmission...</p>
+                            <p className="text-primary">
+                              {role === 'sender' ? 'Symbol sent! Waiting for receiver to guess...' : 'Guess submitted! Waiting for sender to choose...'}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1167,6 +1335,16 @@
                           <h3 className="text-2xl font-bold mb-2" style={{color: isMatch ? '#4ade80' : '#fb923c'}}>
                             {isMatch ? '✨ TELEPATHIC MATCH! ✨' : 'Not this time. Keep practicing!'}
                           </h3>
+                          <div className="flex justify-center gap-6 mb-3" style={{marginTop: '0.5rem'}}>
+                            <div className="text-center">
+                              <p className="text-secondary text-sm mb-1">Sent</p>
+                              <span style={{fontSize: '2.5rem'}}>{telepathySymbols.find(s => s.id === (role === 'sender' ? selectedSymbol : partnerSymbol))?.icon}</span>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-secondary text-sm mb-1">Guessed</p>
+                              <span style={{fontSize: '2.5rem'}}>{telepathySymbols.find(s => s.id === (role === 'receiver' ? guessedSymbol : partnerSymbol))?.icon}</span>
+                            </div>
+                          </div>
                           {isMatch && (
                             <p className="text-white">
                               You both earned <span className="font-bold" style={{color: '#fbbf24'}}>+10</span> points
@@ -1231,6 +1409,128 @@
                           <Send style={{width: '1.25rem', height: '1.25rem'}} />
                         </button>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'profile' && (
+                  <div className="bg-glass rounded-2xl p-6 border-glass">
+                    <div className="text-center mb-6">
+                      <div style={{fontSize: '3rem'}} className="mb-2">{profile.avatar || '👤'}</div>
+                      <h2 className="text-3xl font-bold text-white mb-2">{t.profile.title}</h2>
+                      <p className="text-primary">{t.profile.subtitle}</p>
+                    </div>
+
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '1.25rem'}}>
+                      {/* Avatar Emoji */}
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.avatar}</label>
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '0.5rem'}}>
+                          {avatarEmojis.map(emoji => (
+                            <button
+                              key={emoji}
+                              onClick={() => setProfile({...profile, avatar: emoji})}
+                              style={{
+                                fontSize: '1.5rem',
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                border: profile.avatar === emoji ? '2px solid #a78bfa' : '2px solid transparent',
+                                background: profile.avatar === emoji ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Bio */}
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.bio}</label>
+                        <textarea
+                          value={profile.bio}
+                          onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                          placeholder={t.profile.bioPlaceholder}
+                          rows="3"
+                        />
+                      </div>
+
+                      {/* Starseed Type & Experience Level */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.starseedType}</label>
+                          <select
+                            value={profile.starseedType}
+                            onChange={(e) => setProfile({...profile, starseedType: e.target.value})}
+                          >
+                            <option value="">--</option>
+                            {starseedTypes.map(st => (
+                              <option key={st} value={st}>{t.profile.starseedTypes[st]}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.experienceLevel}</label>
+                          <select
+                            value={profile.experienceLevel}
+                            onChange={(e) => setProfile({...profile, experienceLevel: e.target.value})}
+                          >
+                            <option value="">--</option>
+                            {experienceLevels.map(lvl => (
+                              <option key={lvl} value={lvl}>{t.profile.experienceLevels[lvl]}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Country */}
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.country}</label>
+                        <input
+                          type="text"
+                          value={profile.country}
+                          onChange={(e) => setProfile({...profile, country: e.target.value})}
+                          placeholder={t.profile.countryPlaceholder}
+                        />
+                      </div>
+
+                      {/* Spiritual Interests */}
+                      <div>
+                        <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.interests}</label>
+                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
+                          {interestKeys.map(key => (
+                            <button
+                              key={key}
+                              onClick={() => toggleInterest(key)}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '9999px',
+                                border: profile.interests.includes(key) ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.2)',
+                                background: profile.interests.includes(key) ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {t.profile.interestsList[key]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Save Button */}
+                      <button onClick={saveProfile} className="btn-primary w-full" style={{fontSize: '1.125rem', marginTop: '0.5rem'}}>
+                        {profileSaved ? t.profile.saved : t.profile.save}
+                      </button>
+
+                      {profileSaved && (
+                        <div className="result-success rounded-xl p-3 text-center">
+                          <p style={{color: '#4ade80'}} className="font-bold">{t.profile.saved}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
