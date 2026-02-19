@@ -236,6 +236,7 @@
         }
         input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.5); }
         input:focus, textarea:focus, select:focus { outline: none; border-color: #a78bfa; }
+        select option { background: #1e1440; color: white; }
         
         .fixed { position: fixed; }
         .sticky { position: sticky; }
@@ -444,7 +445,7 @@
               bioPlaceholder: "Tell us about your spiritual journey...",
               starseedType: "Starseed Type",
               avatar: "Avatar",
-              country: "Country",
+              country: "Country (optional)",
               countryPlaceholder: "Your country",
               interests: "Spiritual Interests",
               experienceLevel: "Experience Level",
@@ -516,7 +517,7 @@
               bioPlaceholder: "Raccontaci del tuo percorso spirituale...",
               starseedType: "Tipo di Starseed",
               avatar: "Avatar",
-              country: "Paese",
+              country: "Paese (opzionale)",
               countryPlaceholder: "Il tuo paese",
               interests: "Interessi Spirituali",
               experienceLevel: "Livello Esperienza",
@@ -912,7 +913,9 @@
               avatar: profile.avatar,
               country: profile.country,
               interests: profile.interests,
-              experience_level: profile.experienceLevel
+              experience_level: profile.experienceLevel,
+              telepathy_score: telepathyScore,
+              telepathy_best: bestScore
             };
             try {
               await supabase.from('profiles').upsert(row);
