@@ -687,7 +687,7 @@
             duration: 30
           });
           
-          const [sessionId, setSessionId] = useState(() => Date.now() + '-' + Math.random());
+          const [sessionId, setSessionId] = useState(() => localStorage.getItem('ga_session_id') || (Date.now() + '-' + Math.random()));
           const [tempPassword, setTempPassword] = useState('');
           const [tempEmail, setTempEmail] = useState('');
           const [passwordHash, setPasswordHash] = useState(null);
@@ -920,6 +920,7 @@
 
             // Match — load session_id and profile
             setSessionId(existing.session_id);
+            localStorage.setItem('ga_session_id', existing.session_id);
             setPasswordHash(hash);
             setUserEmail(email);
             setIsGuest(false);
@@ -972,6 +973,7 @@
             setPasswordHash(hash);
             const newSid = Date.now() + '-' + Math.random();
             setSessionId(newSid);
+            localStorage.setItem('ga_session_id', newSid);
 
             await supabase.from('profiles').insert({
               session_id: newSid,
@@ -1003,6 +1005,7 @@
             localStorage.removeItem('ga_email');
             localStorage.removeItem('ga_is_guest');
             localStorage.removeItem('ga_profile');
+            localStorage.removeItem('ga_session_id');
             setNickname('');
             setUserEmail('');
             setIsGuest(false);
