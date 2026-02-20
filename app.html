@@ -545,6 +545,18 @@
               community: "Community",
               noProfile: "No profile yet",
               close: "Close"
+            },
+            messages: {
+              title: "Messages",
+              subtitle: "Private conversations",
+              noConversations: "No conversations yet. Visit a profile and send a message!",
+              placeholder: "Type a message...",
+              send: "Send",
+              sendMessage: "Send Message",
+              newMessage: "New message to",
+              messagePlaceholder: "Write your first message...",
+              back: "Back",
+              you: "You"
             }
           },
           it: {
@@ -651,6 +663,18 @@
               community: "Comunita'",
               noProfile: "Nessun profilo ancora",
               close: "Chiudi"
+            },
+            messages: {
+              title: "Messaggi",
+              subtitle: "Conversazioni private",
+              noConversations: "Nessuna conversazione. Visita un profilo e invia un messaggio!",
+              placeholder: "Scrivi un messaggio...",
+              send: "Invia",
+              sendMessage: "Invia Messaggio",
+              newMessage: "Nuovo messaggio a",
+              messagePlaceholder: "Scrivi il tuo primo messaggio...",
+              back: "Indietro",
+              you: "Tu"
             }
           }
         };
@@ -679,6 +703,10 @@
           const [chatMessages, setChatMessages] = useState([]);
           const [newMessage, setNewMessage] = useState('');
           
+          const [privateMessages, setPrivateMessages] = useState([]);
+          const [newPrivateMessage, setNewPrivateMessage] = useState('');
+          const [unreadCount, setUnreadCount] = useState(0);
+
           const [rituals, setRituals] = useState([]);
           const [showCreateRitual, setShowCreateRitual] = useState(false);
           const [newRitual, setNewRitual] = useState({
@@ -1171,6 +1199,7 @@
 
           const openProfile = async (userName) => {
             try {
+              markAsRead(userName);
               const { data } = await supabase.from('profiles').select('*').eq('nickname', userName);
               if (data && data.length > 0) {
                 const p = data[0];
@@ -1214,6 +1243,52 @@
             });
             
             setNewMessage('');
+          };
+
+          // Load private messages
+          useEffect(() => {
+            if (!nickname) return;
+            const loadMessages = async () => {
+              try {
+                const { data: sent } = await supabase.from('private_messages').select('*').eq('sender_name', nickname);
+                const { data: received } = await supabase.from('private_messages').select('*').eq('receiver_name', nickname);
+                const all = [...(sent || []), ...(received || [])];
+                all.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                setPrivateMessages(all);
+                const unread = (received || []).filter(m => !m.is_read).length;
+                setUnreadCount(unread);
+              } catch (err) {
+                console.warn('Failed to load messages:', err);
+              }
+            };
+            loadMessages();
+            const interval = setInterval(loadMessages, 4000);
+            return () => clearInterval(interval);
+          }, [nickname]);
+
+          const getConversationMessages = (otherUser) => {
+            return privateMessages.filter(m =>
+              (m.sender_name === nickname && m.receiver_name === otherUser) ||
+              (m.sender_name === otherUser && m.receiver_name === nickname)
+            ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          };
+
+          const sendPrivateMessage = async (receiverName, text) => {
+            if (!text.trim() || !receiverName) return;
+            await supabase.from('private_messages').insert({
+              sender_id: sessionId,
+              sender_name: nickname || 'Anonymous',
+              receiver_name: receiverName,
+              content: text.trim(),
+              is_read: false
+            });
+          };
+
+          const markAsRead = async (otherUser) => {
+            const unreadMsgs = privateMessages.filter(m => m.sender_name === otherUser && m.receiver_name === nickname && !m.is_read);
+            for (const msg of unreadMsgs) {
+              await supabase.from('private_messages').update({ is_read: true }).eq('id', msg.id);
+            }
           };
 
           const createRitual = async () => {
@@ -1456,6 +1531,19 @@
                           border: isGuest ? '1px solid rgba(251,191,36,0.5)' : '1px solid rgba(34,197,94,0.5)'
                         }}>{isGuest ? t.guestBadge : t.registeredBadge}</span>
                       </div>
+                      {unreadCount > 0 && (
+                        <span style={{
+                          background: '#ef4444',
+                          color: '#fff',
+                          borderRadius: '9999px',
+                          padding: '0.15rem 0.5rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          cursor: 'default'
+                        }} title={t.messages.title}>
+                          {unreadCount} 💬
+                        </span>
+                      )}
                       <button onClick={handleLogout} className="btn-secondary px-3 py-2" style={{fontSize: '0.8rem'}}>
                         {t.logout}
                       </button>
@@ -2156,7 +2244,76 @@
                           </div>
                         )}
 
-                        <button onClick={() => setViewingProfile(null)} className="btn-secondary w-full mt-2">
+                        {/* Private Messages Section */}
+                        {viewingProfile.nickname !== nickname && (
+                          <div>
+                            <p className="text-secondary text-xs mb-2">{t.messages.title}</p>
+                            <div className="bg-glass-dark rounded-xl" style={{maxHeight: '250px', display: 'flex', flexDirection: 'column'}}>
+                              {/* Messages list */}
+                              <div style={{flex: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px'}}>
+                                {getConversationMessages(viewingProfile.nickname).length === 0 ? (
+                                  <p className="text-secondary text-sm text-center" style={{padding: '1rem 0'}}>{t.messages.noConversations}</p>
+                                ) : (
+                                  getConversationMessages(viewingProfile.nickname).map(msg => {
+                                    const isMe = msg.sender_name === nickname;
+                                    return (
+                                      <div key={msg.id} style={{
+                                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                        maxWidth: '80%'
+                                      }}>
+                                        <div style={{
+                                          padding: '0.4rem 0.75rem',
+                                          borderRadius: isMe ? '0.75rem 0.75rem 0.15rem 0.75rem' : '0.75rem 0.75rem 0.75rem 0.15rem',
+                                          background: isMe ? 'rgba(139, 92, 246, 0.5)' : 'rgba(255, 255, 255, 0.1)',
+                                          border: isMe ? '1px solid rgba(139, 92, 246, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)'
+                                        }}>
+                                          <p className="text-white" style={{fontSize: '0.8rem'}}>{msg.content}</p>
+                                        </div>
+                                        <p style={{fontSize: '0.6rem', color: '#c4b5fd', marginTop: '0.1rem', textAlign: isMe ? 'right' : 'left'}}>
+                                          {new Date(msg.created_at).toLocaleTimeString(undefined, {hour: '2-digit', minute: '2-digit'})}
+                                        </p>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              {/* Send input */}
+                              <div style={{padding: '0.5rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)'}}>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={newPrivateMessage}
+                                    onChange={(e) => setNewPrivateMessage(e.target.value)}
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter' && newPrivateMessage.trim()) {
+                                        sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
+                                        setNewPrivateMessage('');
+                                        markAsRead(viewingProfile.nickname);
+                                      }
+                                    }}
+                                    placeholder={t.messages.placeholder}
+                                    style={{flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem'}}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (newPrivateMessage.trim()) {
+                                        sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
+                                        setNewPrivateMessage('');
+                                        markAsRead(viewingProfile.nickname);
+                                      }
+                                    }}
+                                    className="btn-primary"
+                                    style={{padding: '0.5rem 1rem'}}
+                                  >
+                                    <Send style={{width: '1rem', height: '1rem'}} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <button onClick={() => { setViewingProfile(null); setNewPrivateMessage(''); }} className="btn-secondary w-full mt-2">
                           {t.social.close}
                         </button>
                       </div>
