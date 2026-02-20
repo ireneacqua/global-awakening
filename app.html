@@ -469,7 +469,9 @@
             registeredBadge: "Registered",
             registerInvite: "Register to save your profile permanently",
             logout: "Logout",
-            tabs: { rituals: "Rituals", telepathy: "Telepathy", chat: "Chat", map: "Map", profile: "Profile" },
+            tabs: { rituals: "Rituals", telepathy: "Telepathy", consciousness: "Consciousness" },
+            showTelepathyScore: "Show telepathy score",
+            editProfile: "Edit Profile",
             profile: {
               title: "Your Profile",
               subtitle: "Tell the community about yourself",
@@ -573,7 +575,9 @@
             registeredBadge: "Registrato",
             registerInvite: "Registrati per salvare il profilo in modo permanente",
             logout: "Esci",
-            tabs: { rituals: "Rituali", telepathy: "Telepatia", chat: "Chat", map: "Mappa", profile: "Profilo" },
+            tabs: { rituals: "Rituali", telepathy: "Telepatia", consciousness: "Coscienza" },
+            showTelepathyScore: "Mostra punteggio telepatia",
+            editProfile: "Modifica Profilo",
             profile: {
               title: "Il Tuo Profilo",
               subtitle: "Racconta alla comunità di te",
@@ -715,6 +719,11 @@
           });
           const [profileSaved, setProfileSaved] = useState(false);
           const [viewingProfile, setViewingProfile] = useState(null);
+          const [showEditProfile, setShowEditProfile] = useState(false);
+          const [showTelepathyScore, setShowTelepathyScore] = useState(() => {
+            const stored = localStorage.getItem('ga_show_telepathy');
+            return stored !== null ? stored === 'true' : true;
+          });
 
           // Load scores
           useEffect(() => {
@@ -987,7 +996,8 @@
               interests: [],
               experience_level: '',
               telepathy_score: 0,
-              telepathy_best: 0
+              telepathy_best: 0,
+              show_telepathy_score: true
             });
 
             setLoginSuccess(t.newAccountCreated);
@@ -1133,7 +1143,8 @@
               interests: profile.interests,
               experience_level: profile.experienceLevel,
               telepathy_score: telepathyScore,
-              telepathy_best: bestScore
+              telepathy_best: bestScore,
+              show_telepathy_score: showTelepathyScore
             };
             if (passwordHash) row.password_hash = passwordHash;
             if (userEmail) row.email = userEmail;
@@ -1172,7 +1183,8 @@
                   interests: p.interests || [],
                   experienceLevel: p.experience_level || '',
                   telepathyScore: p.telepathy_score || 0,
-                  telepathyBest: p.telepathy_best || 0
+                  telepathyBest: p.telepathy_best || 0,
+                  showTelepathyScore: p.show_telepathy_score !== false
                 });
               } else {
                 setViewingProfile({
@@ -1434,7 +1446,7 @@
                         {lang === 'en' ? 'IT' : 'EN'}
                       </button>
                       <div className="flex items-center gap-2">
-                        <div className="text-white font-medium">{profile.avatar && <span style={{marginRight: '0.25rem'}}>{profile.avatar}</span>}{nickname}</div>
+                        <div className="text-white font-medium" style={{cursor: 'pointer'}} onClick={() => setShowEditProfile(true)} title={t.editProfile}>{profile.avatar && <span style={{marginRight: '0.25rem'}}>{profile.avatar}</span>}{nickname}</div>
                         <span style={{
                           fontSize: '0.65rem',
                           padding: '0.15rem 0.5rem',
@@ -1473,7 +1485,7 @@
 
               <div className="container" style={{paddingTop: '0.5rem'}}>
                 <div className="flex gap-2 bg-glass rounded-2xl p-3" style={{overflowX: 'auto'}}>
-                  {['rituals', 'telepathy', 'map', 'chat', 'profile'].map((tab) => (
+                  {['rituals', 'telepathy', 'consciousness'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -1563,63 +1575,113 @@
                   </div>
                 )}
 
-                {activeTab === 'map' && (
-                  <div>
-                    <div className="mb-6">
-                      <h2 className="text-3xl font-bold text-white mb-2">{t.map.title}</h2>
-                      <p className="text-primary">{t.map.subtitle}</p>
-                    </div>
+                {activeTab === 'consciousness' && (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                    {/* Chat Section */}
+                    <div className="bg-glass rounded-2xl border-glass chat-container" style={{height: '400px'}}>
+                      <div className="p-4 border-b">
+                        <h2 className="text-2xl font-bold text-white">Global Chat</h2>
+                        <p className="text-primary text-sm">{onlineUsers.length} starseeds online</p>
+                      </div>
 
-                    <div className="map-container">
-                      <img 
-                        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500'%3E%3Crect fill='%23111827' width='1000' height='500'/%3E%3Cpath fill='%231f2937' d='M0 250 Q 250 200 500 250 T 1000 250 L 1000 500 L 0 500 Z'/%3E%3C/svg%3E"
-                        alt="World map"
-                        style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                      />
-                      {onlineUsers.map(user => {
-                        const x = ((user.lng + 180) / 360) * 100;
-                        const y = ((90 - user.lat) / 180) * 100;
-
-                        return (
-                          <React.Fragment key={user.id}>
-                            <div
-                              className="map-point"
-                              style={{left: `${x}%`, top: `${y}%`}}
-                              title={`${user.avatar || ''} ${user.nickname}`}
-                              onClick={() => openProfile(user.nickname)}
-                            />
-                            <div
-                              className="map-ripple ripple"
-                              style={{left: `${x}%`, top: `${y}%`}}
-                            />
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mt-4 text-center">
-                      <span className="text-white text-lg font-bold">{onlineUsers.length}</span>
-                      <span className="text-primary ml-2">{t.map.visible}</span>
-                    </div>
-
-                    {/* Community List */}
-                    <div className="mt-6">
-                      <h3 className="text-xl font-bold text-white mb-3">{t.social.community}</h3>
-                      <div className="bg-glass rounded-2xl border-glass p-4" style={{maxHeight: '300px', overflowY: 'auto'}}>
-                        {onlineUsers.map(user => (
-                          <div
-                            key={user.id}
-                            className="flex items-center gap-3 p-3 rounded-xl transition-all"
-                            style={{cursor: 'pointer', background: 'rgba(255,255,255,0.05)', marginBottom: '0.5rem'}}
-                            onClick={() => openProfile(user.nickname)}
-                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
-                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                          >
-                            <span style={{fontSize: '1.5rem'}}>{user.avatar || '👤'}</span>
-                            <span className="text-white font-medium">{user.nickname}</span>
-                            <div className="online-dot" style={{marginLeft: 'auto'}} />
+                      <div className="chat-messages">
+                        {chatMessages.length === 0 && (
+                          <div className="text-center text-primary py-8">
+                            No messages yet. Start the conversation!
+                          </div>
+                        )}
+                        {chatMessages.map((msg) => (
+                          <div key={msg.id} className="chat-message">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span
+                                className="text-primary font-medium text-sm"
+                                style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
+                                onClick={() => openProfile(msg.user_name)}
+                              >
+                                {msg.user_name}
+                              </span>
+                              <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.created_at).toLocaleTimeString()}</span>
+                            </div>
+                            <p className="text-white">{msg.content}</p>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="p-4 border-t">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                            placeholder="Share your message..."
+                            style={{flex: 1}}
+                          />
+                          <button onClick={sendChatMessage} className="btn-primary px-6 py-3">
+                            <Send style={{width: '1.25rem', height: '1.25rem'}} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Map Section */}
+                    <div>
+                      <div className="mb-4">
+                        <h2 className="text-3xl font-bold text-white mb-2">{t.map.title}</h2>
+                        <p className="text-primary">{t.map.subtitle}</p>
+                      </div>
+
+                      <div className="map-container">
+                        <img
+                          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500'%3E%3Crect fill='%23111827' width='1000' height='500'/%3E%3Cpath fill='%231f2937' d='M0 250 Q 250 200 500 250 T 1000 250 L 1000 500 L 0 500 Z'/%3E%3C/svg%3E"
+                          alt="World map"
+                          style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                        />
+                        {onlineUsers.map(user => {
+                          const x = ((user.lng + 180) / 360) * 100;
+                          const y = ((90 - user.lat) / 180) * 100;
+
+                          return (
+                            <React.Fragment key={user.id}>
+                              <div
+                                className="map-point"
+                                style={{left: `${x}%`, top: `${y}%`}}
+                                title={`${user.avatar || ''} ${user.nickname}`}
+                                onClick={() => openProfile(user.nickname)}
+                              />
+                              <div
+                                className="map-ripple ripple"
+                                style={{left: `${x}%`, top: `${y}%`}}
+                              />
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-4 text-center">
+                        <span className="text-white text-lg font-bold">{onlineUsers.length}</span>
+                        <span className="text-primary ml-2">{t.map.visible}</span>
+                      </div>
+
+                      {/* Community List */}
+                      <div className="mt-6">
+                        <h3 className="text-xl font-bold text-white mb-3">{t.social.community}</h3>
+                        <div className="bg-glass rounded-2xl border-glass p-4" style={{maxHeight: '300px', overflowY: 'auto'}}>
+                          {onlineUsers.map(user => (
+                            <div
+                              key={user.id}
+                              className="flex items-center gap-3 p-3 rounded-xl transition-all"
+                              style={{cursor: 'pointer', background: 'rgba(255,255,255,0.05)', marginBottom: '0.5rem'}}
+                              onClick={() => openProfile(user.nickname)}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                            >
+                              <span style={{fontSize: '1.5rem'}}>{user.avatar || '👤'}</span>
+                              <span className="text-white font-medium">{user.nickname}</span>
+                              <div className="online-dot" style={{marginLeft: 'auto'}} />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1765,61 +1827,16 @@
                   </div>
                 )}
 
-                {activeTab === 'chat' && (
-                  <div className="bg-glass rounded-2xl border-glass chat-container">
-                    <div className="p-4 border-b">
-                      <h2 className="text-2xl font-bold text-white">Global Chat</h2>
-                      <p className="text-primary text-sm">{onlineUsers.length} starseeds online</p>
-                    </div>
-                    
-                    <div className="chat-messages">
-                      {chatMessages.length === 0 && (
-                        <div className="text-center text-primary py-8">
-                          No messages yet. Start the conversation!
-                        </div>
-                      )}
-                      {chatMessages.map((msg) => (
-                        <div key={msg.id} className="chat-message">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span
-                              className="text-primary font-medium text-sm"
-                              style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
-                              onClick={() => openProfile(msg.user_name)}
-                            >
-                              {msg.user_name}
-                            </span>
-                            <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.created_at).toLocaleTimeString()}</span>
-                          </div>
-                          <p className="text-white">{msg.content}</p>
-                        </div>
-                      ))}
-                    </div>
 
-                    <div className="p-4 border-t">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-                          placeholder="Share your message..."
-                          style={{flex: 1}}
-                        />
-                        <button onClick={sendChatMessage} className="btn-primary px-6 py-3">
-                          <Send style={{width: '1.25rem', height: '1.25rem'}} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              </div>
 
-                {activeTab === 'profile' && (
-                  <div className="bg-glass rounded-2xl p-6 border-glass">
+              {showEditProfile && (
+                <div className="modal-overlay" onClick={() => setShowEditProfile(false)}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                     <div className="text-center mb-6">
                       <div style={{fontSize: '3rem'}} className="mb-2">{profile.avatar || '👤'}</div>
-                      <h2 className="text-3xl font-bold text-white mb-2">{t.profile.title}</h2>
-                      <p className="text-primary">{t.profile.subtitle}</p>
-                      <div style={{marginTop: '0.75rem'}}>
+                      <h2 className="text-2xl font-bold text-white mb-2">{t.editProfile}</h2>
+                      <div style={{marginTop: '0.5rem'}}>
                         <span style={{
                           fontSize: '0.8rem',
                           padding: '0.3rem 0.85rem',
@@ -1837,7 +1854,7 @@
                         <div style={{marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.75rem', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)'}}>
                           <p style={{color: '#fbbf24', fontSize: '0.875rem'}}>{t.registerInvite}</p>
                           <button
-                            onClick={() => { handleLogout(); setTimeout(() => setAuthTab('register'), 100); }}
+                            onClick={() => { setShowEditProfile(false); handleLogout(); setTimeout(() => setAuthTab('register'), 100); }}
                             className="btn-primary"
                             style={{marginTop: '0.5rem', fontSize: '0.9rem', padding: '0.5rem 1.5rem'}}
                           >
@@ -1845,6 +1862,52 @@
                           </button>
                         </div>
                       )}
+                    </div>
+
+                    {/* Telepathy Score Display */}
+                    <div className="bg-glass-dark rounded-xl p-4 mb-4">
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="text-center">
+                          <p className="text-secondary text-xs mb-1">{t.social.telepathyScore}</p>
+                          <p className="text-2xl font-bold" style={{color: '#fbbf24'}}>{telepathyScore}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-secondary text-xs mb-1">{t.social.bestScore}</p>
+                          <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{bestScore}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between" style={{padding: '0.5rem 0'}}>
+                        <span className="text-white text-sm">{t.showTelepathyScore}</span>
+                        <button
+                          onClick={() => {
+                            const newVal = !showTelepathyScore;
+                            setShowTelepathyScore(newVal);
+                            localStorage.setItem('ga_show_telepathy', String(newVal));
+                          }}
+                          style={{
+                            width: '3rem',
+                            height: '1.5rem',
+                            borderRadius: '9999px',
+                            background: showTelepathyScore ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.2)',
+                            border: showTelepathyScore ? '1px solid rgba(34,197,94,0.7)' : '1px solid rgba(255,255,255,0.3)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'all 0.3s'
+                          }}
+                        >
+                          <div style={{
+                            width: '1.1rem',
+                            height: '1.1rem',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            position: 'absolute',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            left: showTelepathyScore ? 'calc(100% - 1.3rem)' : '0.15rem',
+                            transition: 'all 0.3s'
+                          }} />
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{display: 'flex', flexDirection: 'column', gap: '1.25rem'}}>
@@ -1988,7 +2051,7 @@
                       )}
 
                       {/* Save Button */}
-                      <button onClick={saveProfile} className="btn-primary w-full" style={{fontSize: '1.125rem', marginTop: '0.5rem'}}>
+                      <button onClick={() => { saveProfile(); setShowEditProfile(false); }} className="btn-primary w-full" style={{fontSize: '1.125rem', marginTop: '0.5rem'}}>
                         {profileSaved ? t.profile.saved : t.profile.save}
                       </button>
 
@@ -1999,8 +2062,8 @@
                       )}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {viewingProfile && (
                 <div className="modal-overlay" onClick={() => setViewingProfile(null)}>
@@ -2079,17 +2142,19 @@
                           </div>
                         )}
 
-                        {/* Telepathy Scores */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-glass-dark rounded-xl p-3 text-center">
-                            <p className="text-secondary text-xs mb-1">{t.social.telepathyScore}</p>
-                            <p className="text-2xl font-bold" style={{color: '#fbbf24'}}>{viewingProfile.telepathyScore}</p>
+                        {/* Telepathy Scores — only if user allows visibility */}
+                        {viewingProfile.showTelepathyScore !== false && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-glass-dark rounded-xl p-3 text-center">
+                              <p className="text-secondary text-xs mb-1">{t.social.telepathyScore}</p>
+                              <p className="text-2xl font-bold" style={{color: '#fbbf24'}}>{viewingProfile.telepathyScore}</p>
+                            </div>
+                            <div className="bg-glass-dark rounded-xl p-3 text-center">
+                              <p className="text-secondary text-xs mb-1">{t.social.bestScore}</p>
+                              <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{viewingProfile.telepathyBest}</p>
+                            </div>
                           </div>
-                          <div className="bg-glass-dark rounded-xl p-3 text-center">
-                            <p className="text-secondary text-xs mb-1">{t.social.bestScore}</p>
-                            <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{viewingProfile.telepathyBest}</p>
-                          </div>
-                        </div>
+                        )}
 
                         <button onClick={() => setViewingProfile(null)} className="btn-secondary w-full mt-2">
                           {t.social.close}
