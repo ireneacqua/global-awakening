@@ -1848,13 +1848,13 @@
             return () => clearInterval(interval);
           }, [nickname]);
 
-          const markNotifsRead = async () => {
-            if (notifItems.length === 0) return;
+          const markOneNotifRead = async (notifId, tabTarget) => {
             await fetch(
-              `${SUPABASE_URL}/rest/v1/notifications?user_nickname=eq.${encodeURIComponent(nickname)}&read=eq.false`,
+              `${SUPABASE_URL}/rest/v1/notifications?id=eq.${notifId}`,
               { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ read: true }) }
             );
-            setNotifItems([]);
+            setNotifItems(prev => prev.filter(n => n.id !== notifId));
+            setActiveTab(tabTarget);
             setShowNotifPanel(false);
           };
 
@@ -2265,22 +2265,20 @@
                                 {notifItems.map(n => {
                                   const tabTarget = n.type === 'telepathy_invite' ? 'telepathy' : n.type === 'comment' ? 'consciousness' : 'rituals';
                                   return (
-                                  <div key={n.id} onClick={() => { setActiveTab(tabTarget); setShowNotifPanel(false); markNotifsRead(); }} style={{
+                                  <div key={n.id} style={{
                                     padding: '0.5rem 0.25rem',
                                     borderBottom: '1px solid rgba(255,255,255,0.06)',
-                                    color: '#e5e7eb', fontSize: '0.85rem', display: 'flex', gap: '0.5rem',
-                                    cursor: 'pointer', borderRadius: '0.4rem'
-                                  }}
-                                  onMouseOver={e => e.currentTarget.style.background = 'rgba(124,58,237,0.15)'}
-                                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                                  >
-                                    <span>{n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
-                                    <span>{n.message}</span>
+                                    display: 'flex', alignItems: 'center', gap: '0.5rem'
+                                  }}>
+                                    <span style={{fontSize: '1rem'}}>{n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
+                                    <span style={{flex: 1, color: '#e5e7eb', fontSize: '0.82rem'}}>{n.message}</span>
+                                    <button
+                                      onClick={() => markOneNotifRead(n.id, tabTarget)}
+                                      className="btn-primary"
+                                      style={{fontSize: '0.75rem', padding: '0.2rem 0.6rem', whiteSpace: 'nowrap'}}
+                                    >Vai</button>
                                   </div>);
                                 })}
-                                <button onClick={markNotifsRead} className="btn-primary" style={{width: '100%', marginTop: '0.75rem', fontSize: '0.8rem'}}>
-                                  Segna come lette
-                                </button>
                               </>
                             )}
                           </div>
