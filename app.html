@@ -1848,14 +1848,20 @@
             return () => clearInterval(interval);
           }, [nickname]);
 
-          const markOneNotifRead = async (notifId, tabTarget) => {
+          const markOneNotifRead = async (notif, tabTarget) => {
             await fetch(
-              `${SUPABASE_URL}/rest/v1/notifications?id=eq.${notifId}`,
+              `${SUPABASE_URL}/rest/v1/notifications?id=eq.${notif.id}`,
               { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ read: true }) }
             );
-            setNotifItems(prev => prev.filter(n => n.id !== notifId));
-            setActiveTab(tabTarget);
+            setNotifItems(prev => prev.filter(n => n.id !== notif.id));
             setShowNotifPanel(false);
+            if (notif.type === 'private_message') {
+              // Estrae il nickname del mittente dal messaggio e apre il profilo
+              const senderMatch = notif.message.match(/^(.+) ti ha inviato/);
+              if (senderMatch) openProfile(senderMatch[1]);
+            } else {
+              setActiveTab(tabTarget);
+            }
           };
 
           const getConversationMessages = (otherUser) => {
@@ -1867,13 +1873,20 @@
 
           const sendPrivateMessage = async (receiverName, text) => {
             if (!text.trim() || !receiverName) return;
-            await supabase.from('private_messages').insert({
+            const { error } = await supabase.from('private_messages').insert({
               sender_id: sessionId,
               sender_name: nickname || 'Anonymous',
               receiver_name: receiverName,
               content: text.trim(),
               is_read: false
             });
+            if (!error) {
+              await supabase.from('notifications').insert({
+                user_nickname: receiverName,
+                type: 'private_message',
+                message: `${nickname} ti ha inviato un messaggio privato`
+              });
+            }
           };
 
           const markAsRead = async (otherUser) => {
@@ -2263,17 +2276,18 @@
                             ) : (
                               <>
                                 {notifItems.map(n => {
-                                  const tabTarget = n.type === 'telepathy_invite' ? 'telepathy' : n.type === 'comment' ? 'consciousness' : 'rituals';
+                                  const tabTarget = n.type === 'telepathy_invite' ? 'telepathy' : n.type === 'comment' ? 'consciousness' : n.type === 'private_message' ? null : 'rituals';
+                                  const icon = n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : n.type === 'private_message' ? '✉️' : '🧠';
                                   return (
                                   <div key={n.id} style={{
                                     padding: '0.5rem 0.25rem',
                                     borderBottom: '1px solid rgba(255,255,255,0.06)',
                                     display: 'flex', alignItems: 'center', gap: '0.5rem'
                                   }}>
-                                    <span style={{fontSize: '1rem'}}>{n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
+                                    <span style={{fontSize: '1rem'}}>{icon}</span>
                                     <span style={{flex: 1, color: '#e5e7eb', fontSize: '0.82rem'}}>{n.message}</span>
                                     <button
-                                      onClick={() => markOneNotifRead(n.id, tabTarget)}
+                                      onClick={() => markOneNotifRead(n, tabTarget)}
                                       className="btn-primary"
                                       style={{fontSize: '0.75rem', padding: '0.2rem 0.6rem', whiteSpace: 'nowrap'}}
                                     >Vai</button>
