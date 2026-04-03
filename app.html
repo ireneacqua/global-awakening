@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Awakening Platform</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭐</text></svg>">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -387,6 +388,7 @@
             max-height: 90vh;
             overflow-y: auto;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
         }
         
         @media (max-width: 768px) {
@@ -2391,6 +2393,7 @@
               {showEditProfile && (
                 <div className="modal-overlay" onClick={() => setShowEditProfile(false)}>
                   <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setShowEditProfile(false)} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
                     <div className="text-center mb-6">
                       <div style={{fontSize: '3rem'}} className="mb-2">{profile.avatar || '👤'}</div>
                       <h2 className="text-2xl font-bold text-white mb-2">{t.editProfile}</h2>
@@ -2626,6 +2629,7 @@
               {viewingProfile && (
                 <div className="modal-overlay" onClick={() => setViewingProfile(null)}>
                   <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setViewingProfile(null)} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
                     {viewingProfile.empty ? (
                       <div className="text-center py-6">
                         <div style={{fontSize: '4rem'}} className="mb-4">👤</div>
