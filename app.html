@@ -1091,7 +1091,7 @@
             setSessionId(newSid);
             localStorage.setItem('ga_session_id', newSid);
 
-            await supabase.from('profiles').insert({
+            const { error: insertError } = await supabase.from('profiles').insert({
               session_id: newSid,
               nickname: name,
               email: email,
@@ -1106,6 +1106,11 @@
               telepathy_best: 0,
               show_telepathy_score: true
             });
+
+            if (insertError) {
+              setLoginError(t.registrationError || 'Registration failed. Please try again.');
+              return;
+            }
 
             setLoginSuccess(t.newAccountCreated);
             localStorage.setItem('ga_nickname', name);
