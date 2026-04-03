@@ -1834,7 +1834,7 @@
               <div className="min-h-screen bg-gradient flex items-center justify-center p-4">
                 <div className="absolute top-4 right-4">
                   <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary">
-                    {lang === 'en' ? 'IT' : 'EN'}
+                    {lang === 'en' ? '🌐 EN' : '🌐 IT'}
                   </button>
                 </div>
 
@@ -1975,7 +1975,7 @@
                     </div>
                     <div className="header-right flex items-center gap-3">
                       <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary px-3 py-2">
-                        {lang === 'en' ? 'IT' : 'EN'}
+                        {lang === 'en' ? '🌐 EN' : '🌐 IT'}
                       </button>
                       <div className="flex items-center gap-2">
                         <div className="text-white font-medium" style={{cursor: 'pointer'}} onClick={() => setShowEditProfile(true)} title={t.editProfile}>{profile.avatar && <span style={{marginRight: '0.25rem'}}>{profile.avatar}</span>}{nickname}</div>
