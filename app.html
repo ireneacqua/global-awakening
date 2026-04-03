@@ -2309,7 +2309,7 @@
                                 <div key={u.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.05)'}}>
                                   <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                                     <span style={{width: '0.6rem', height: '0.6rem', borderRadius: '50%', background: u.status === 'available' ? '#4ade80' : '#9ca3af', display: 'inline-block'}} />
-                                    <span className="text-white text-sm font-medium">{u.nickname}</span>
+                                    <span className="text-white text-sm font-medium" style={{cursor: 'pointer', textDecoration: 'underline dotted'}} onClick={() => openProfile(u.nickname)}>{u.nickname}</span>
                                     <span className="text-secondary text-xs">{u.status === 'busy' ? 'in sessione' : 'disponibile'}</span>
                                   </div>
                                   {u.status === 'available' && directInviteTarget?.id !== u.id && (
