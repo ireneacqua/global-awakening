@@ -2639,17 +2639,6 @@
 
                     {!partner && !searchingPartner && !sessionEnded && (
                       <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                        {/* Banner invito in arrivo */}
-                        {incomingInvite && (
-                          <div className="bg-glass-dark rounded-xl p-4" style={{border: '1px solid rgba(167,139,250,0.5)', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                            <p className="text-white font-bold">✨ {incomingInvite.from_name} ti vuole fare training telepatico!</p>
-                            <div style={{display: 'flex', gap: '0.75rem'}}>
-                              <button onClick={acceptInvite} className="btn-primary" style={{flex: 1}}>Accetta</button>
-                              <button onClick={declineInvite} className="btn-secondary" style={{flex: 1}}>Rifiuta</button>
-                            </div>
-                          </div>
-                        )}
-
                         {/* Come funziona */}
                         <div className="bg-glass-dark rounded-xl p-4">
                           <h3 className="text-white font-bold mb-2">Come funziona:</h3>
@@ -3315,6 +3304,20 @@
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {incomingInvite && !partner && (
+                <div className="modal-overlay">
+                  <div className="modal-content" style={{maxWidth: '360px', textAlign: 'center'}}>
+                    <div style={{fontSize: '3rem', marginBottom: '0.75rem'}}>🧠</div>
+                    <p className="text-white font-bold text-xl mb-2">Invito al Training Telepatico</p>
+                    <p className="text-primary mb-6">✨ <strong>{incomingInvite.from_name}</strong> ti vuole fare training telepatico!</p>
+                    <div style={{display: 'flex', gap: '0.75rem'}}>
+                      <button onClick={acceptInvite} className="btn-primary" style={{flex: 1}}>Accetta</button>
+                      <button onClick={declineInvite} className="btn-secondary" style={{flex: 1}}>Rifiuta</button>
+                    </div>
                   </div>
                 </div>
               )}
