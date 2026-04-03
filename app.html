@@ -860,6 +860,10 @@
           const [newPostContent, setNewPostContent] = useState('');
           const [newCommentContents, setNewCommentContents] = useState({});
           const expandedPostIdRef = React.useRef(null);
+          const [ritualCommentsMap, setRitualCommentsMap] = useState({});
+          const [expandedRitualId, setExpandedRitualId] = useState(null);
+          const [newRitualCommentContents, setNewRitualCommentContents] = useState({});
+          const expandedRitualIdRef = React.useRef(null);
           const [notifItems, setNotifItems] = useState([]);
           const [showNotifPanel, setShowNotifPanel] = useState(false);
           const [showCreateRitual, setShowCreateRitual] = useState(false);
@@ -874,6 +878,7 @@
           });
           
           React.useEffect(() => { expandedPostIdRef.current = expandedPostId; }, [expandedPostId]);
+          React.useEffect(() => { expandedRitualIdRef.current = expandedRitualId; }, [expandedRitualId]);
 
           const [sessionId, setSessionId] = useState(() => localStorage.getItem('ga_session_id') || (Date.now() + '-' + Math.random()));
           const [tempPassword, setTempPassword] = useState('');
@@ -1045,6 +1050,10 @@
               if (expandedPostIdRef.current) {
                 const { data: commentsData } = await supabase.from('consciousness_comments').select('*').eq('post_id', expandedPostIdRef.current).order('created_at', { ascending: true });
                 if (commentsData) setCommentsMap(prev => ({ ...prev, [expandedPostIdRef.current]: commentsData }));
+              }
+              if (expandedRitualIdRef.current) {
+                const { data: rCommentsData } = await supabase.from('ritual_comments').select('*').eq('ritual_id', expandedRitualIdRef.current).order('created_at', { ascending: true });
+                if (rCommentsData) setRitualCommentsMap(prev => ({ ...prev, [expandedRitualIdRef.current]: rCommentsData }));
               }
             };
             
@@ -1980,6 +1989,37 @@
             return `${minutes}m`;
           };
 
+          const toggleRitualComments = async (ritualId) => {
+            if (expandedRitualId === ritualId) { setExpandedRitualId(null); return; }
+            setExpandedRitualId(ritualId);
+            if (!ritualCommentsMap[ritualId]) {
+              const { data } = await supabase.from('ritual_comments').select('*').eq('ritual_id', ritualId).order('created_at', { ascending: true });
+              if (data) setRitualCommentsMap(prev => ({ ...prev, [ritualId]: data }));
+            }
+          };
+
+          const createRitualComment = async (ritualId) => {
+            const content = (newRitualCommentContents[ritualId] || '').trim();
+            if (!content) return;
+            const { data } = await supabase.from('ritual_comments').insert({
+              ritual_id: ritualId,
+              author_nickname: nickname,
+              content
+            });
+            if (data && data.length > 0) {
+              setRitualCommentsMap(prev => ({ ...prev, [ritualId]: [...(prev[ritualId] || []), ...data] }));
+              setNewRitualCommentContents(prev => ({ ...prev, [ritualId]: '' }));
+              const ritual = rituals.find(r => r.id === ritualId);
+              if (ritual && ritual.creator && ritual.creator !== nickname) {
+                await supabase.from('notifications').insert({
+                  user_nickname: ritual.creator,
+                  type: 'ritual_comment',
+                  message: `${nickname} ha commentato il tuo rituale "${ritual.name}"`
+                });
+              }
+            }
+          };
+
           const createPost = async () => {
             if (!newPostContent.trim()) return;
             await supabase.from('consciousness_posts').insert({
@@ -2228,7 +2268,7 @@
                                     borderBottom: '1px solid rgba(255,255,255,0.06)',
                                     color: '#e5e7eb', fontSize: '0.85rem', display: 'flex', gap: '0.5rem'
                                   }}>
-                                    <span>{n.type === 'comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
+                                    <span>{n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
                                     <span>{n.message}</span>
                                   </div>
                                 ))}
@@ -2315,6 +2355,8 @@
                         const isLive = status === 'live';
                         const isJoined = ritual.participants.includes(sessionId);
                         
+                        const ritualComments = ritualCommentsMap[ritual.id] || [];
+                        const isRitualExpanded = expandedRitualId === ritual.id;
                         return (
                           <div key={ritual.id} className={`ritual-card ${isLive ? 'ritual-live' : ''}`}>
                             <div className="flex items-start justify-between mb-3">
@@ -2322,6 +2364,13 @@
                                 <div style={{fontSize: '2rem'}} className="mb-2">{ritualTypes.find(t => t.id === ritual.type)?.icon}</div>
                                 <h3 className="text-xl font-bold text-white mb-1">{ritual.name}</h3>
                                 <p className="text-secondary text-sm">{ritual.description}</p>
+                                {ritual.creator && (
+                                  <span
+                                    className="text-xs"
+                                    style={{color: '#a78bfa', cursor: 'pointer', textDecoration: 'underline dotted'}}
+                                    onClick={() => openProfile(ritual.creator)}
+                                  >✦ {ritual.creator}</span>
+                                )}
                               </div>
                               <div className="text-2xl" style={{color: '#fbbf24'}}>{ritual.sacred_number}</div>
                             </div>
@@ -2336,14 +2385,12 @@
                                 <Users style={{width: '1rem', height: '1rem', color: '#a78bfa'}} />
                                 <span className="text-white text-sm">{ritual.participants.length} {t.rituals.participants}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm" style={{color: isLive ? '#4ade80' : '#fbbf24'}}>
-                                  {isLive ? t.rituals.live : (status === 'ended' ? t.rituals.ended : `${t.rituals.startsIn} ${status}`)}
-                                </span>
-                              </div>
+                              <span className="text-sm" style={{color: isLive ? '#4ade80' : '#fbbf24'}}>
+                                {isLive ? t.rituals.live : (status === 'ended' ? t.rituals.ended : `${t.rituals.startsIn} ${status}`)}
+                              </span>
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mb-3">
                               <button
                                 onClick={() => joinRitual(ritual.id)}
                                 className={isJoined ? 'btn-secondary flex-1' : 'btn-primary flex-1'}
@@ -2357,6 +2404,55 @@
                                 </button>
                               )}
                             </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => toggleRitualComments(ritual.id)}
+                                className="btn-secondary"
+                                style={{fontSize: '0.8rem', padding: '0.3rem 0.85rem'}}
+                              >
+                                {isRitualExpanded ? t.feed.hideComments : t.feed.showComments}
+                                {ritualComments.length > 0 ? ` (${ritualComments.length})` : ''}
+                              </button>
+                              <button
+                                onClick={() => toggleRitualComments(ritual.id)}
+                                className="btn-primary"
+                                style={{fontSize: '0.8rem', padding: '0.3rem 0.85rem'}}
+                              >
+                                {t.feed.comment}
+                              </button>
+                            </div>
+
+                            {isRitualExpanded && (
+                              <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)'}}>
+                                {ritualComments.map(c => (
+                                  <div key={c.id} style={{marginBottom: '0.75rem', paddingLeft: '1rem', borderLeft: '2px solid rgba(124,58,237,0.4)'}}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span
+                                        className="text-primary font-medium text-xs"
+                                        style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
+                                        onClick={() => openProfile(c.author_nickname)}
+                                      >{c.author_nickname}</span>
+                                      <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(c.created_at).toLocaleTimeString()}</span>
+                                    </div>
+                                    <p className="text-white" style={{fontSize: '0.9rem'}}>{c.content}</p>
+                                  </div>
+                                ))}
+                                <div className="flex gap-2" style={{marginTop: '0.75rem'}}>
+                                  <input
+                                    type="text"
+                                    value={newRitualCommentContents[ritual.id] || ''}
+                                    onChange={(e) => setNewRitualCommentContents(prev => ({ ...prev, [ritual.id]: e.target.value }))}
+                                    onKeyPress={(e) => e.key === 'Enter' && createRitualComment(ritual.id)}
+                                    placeholder={t.feed.addComment}
+                                    style={{flex: 1, fontSize: '0.875rem'}}
+                                  />
+                                  <button onClick={() => createRitualComment(ritual.id)} className="btn-primary px-4 py-2" style={{fontSize: '0.85rem'}}>
+                                    {t.feed.comment}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
