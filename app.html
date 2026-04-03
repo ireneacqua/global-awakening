@@ -430,6 +430,31 @@
           { id: 'infinity', icon: '∞', name: 'Infinity' }
         ];
 
+        const telepathyNumbers = [
+          { id: 'n1', icon: '1', name: '1' },
+          { id: 'n2', icon: '2', name: '2' },
+          { id: 'n3', icon: '3', name: '3' },
+          { id: 'n4', icon: '4', name: '4' },
+          { id: 'n5', icon: '5', name: '5' },
+          { id: 'n6', icon: '6', name: '6' },
+          { id: 'n7', icon: '7', name: '7' },
+          { id: 'n8', icon: '8', name: '8' },
+          { id: 'n9', icon: '9', name: '9' },
+        ];
+
+        const telepathyWords = [
+          { id: 'fuoco', icon: '🔥', name: 'Fuoco' },
+          { id: 'acqua', icon: '💧', name: 'Acqua' },
+          { id: 'terra', icon: '🌍', name: 'Terra' },
+          { id: 'cielo', icon: '☁️', name: 'Cielo' },
+          { id: 'luce', icon: '✨', name: 'Luce' },
+          { id: 'ombra', icon: '🌫️', name: 'Ombra' },
+          { id: 'luna', icon: '🌛', name: 'Luna' },
+          { id: 'sole', icon: '🌞', name: 'Sole' },
+          { id: 'stelle', icon: '💫', name: 'Stelle' },
+          { id: 'vento', icon: '🌬️', name: 'Vento' },
+        ];
+
         const ritualTypes = [
           { id: 'consciousness', name: 'Consciousness Elevation', icon: '🧠' },
           { id: 'dna', name: 'DNA Activation', icon: '🧬' },
@@ -699,7 +724,27 @@
           const [isMatch, setIsMatch] = useState(false);
           const [matchId, setMatchId] = useState(null);
           const [partnerSymbol, setPartnerSymbol] = useState(null);
-          
+
+          // Telepatia v2 — nuovi state
+          const [incomingInvite, setIncomingInvite] = useState(null); // { from_id, from_name, invite_id }
+          const [directInviteTarget, setDirectInviteTarget] = useState(null); // utente a cui abbiamo inviato invito
+          const [currentLevel, setCurrentLevel] = useState('shapes'); // 'shapes' | 'numbers' | 'words'
+          const [roundCount, setRoundCount] = useState(0);
+          const [sessionMatches, setSessionMatches] = useState(0);
+          const [showLevelBanner, setShowLevelBanner] = useState(false);
+          const [myLevelChoice, setMyLevelChoice] = useState(null); // scelta fatta dall'utente locale
+          const [sessionEnded, setSessionEnded] = useState(false); // mostra schermata fine sessione
+          const [onlineUsersForTelepathy, setOnlineUsersForTelepathy] = useState([]); // utenti con status
+          const [senderHasSent, setSenderHasSent] = useState(false);
+          const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
+          const [newTelepathyMessage, setNewTelepathyMessage] = useState('');
+
+          const getCurrentSymbols = (level) => {
+            if (level === 'numbers') return telepathyNumbers;
+            if (level === 'words') return telepathyWords;
+            return telepathySymbols;
+          };
+
           const [chatMessages, setChatMessages] = useState([]);
           const [newMessage, setNewMessage] = useState('');
           
@@ -791,6 +836,36 @@
                   setOnlineUsers([{ id: sessionId, nickname, lat: myLat, lng: myLng }]);
                 } else {
                   setOnlineUsers(data && data.length > 0 ? data : [{ id: sessionId, nickname, lat: myLat, lng: myLng }]);
+
+                  // Arricchisci utenti con stato 'in sessione' o 'disponibile'
+                  const { data: activeMatches } = await supabase.from('telepathy_matches').select('user1_id,user2_id');
+                  const busyIds = new Set();
+                  if (activeMatches) {
+                    activeMatches.forEach(m => {
+                      busyIds.add(m.user1_id);
+                      busyIds.add(m.user2_id);
+                    });
+                  }
+                  const usersWithStatus = (data || []).map(u => ({
+                    ...u,
+                    status: busyIds.has(u.id) ? 'busy' : 'available'
+                  }));
+                  setOnlineUsersForTelepathy(usersWithStatus.filter(u => u.id !== sessionId));
+
+                  // Controlla inviti in arrivo
+                  const { data: invites } = await supabase.from('telepathy_invites')
+                    .select('*').eq('to_id', sessionId).eq('status', 'pending');
+                  if (invites && invites.length > 0) {
+                    const inv = invites[0];
+                    setIncomingInvite({ from_id: inv.from_id, from_name: inv.from_name, invite_id: inv.id });
+                  } else {
+                    setIncomingInvite(null);
+                  }
+
+                  // Pulizia inviti vecchi (> 2 minuti)
+                  await supabase.from('telepathy_invites').delete()
+                    .eq('to_id', sessionId)
+                    .lt('created_at', new Date(Date.now() - 120000).toISOString());
                 }
               } catch (err) {
                 console.warn('Presence update failed:', err);
@@ -1070,9 +1145,9 @@
           const sendSymbol = async () => {
             if (!selectedSymbol || !matchId) return;
             setWaitingForPartner(true);
-
             await supabase.from('telepathy_matches').update({
-              sender_symbol: selectedSymbol
+              sender_symbol: selectedSymbol,
+              level: currentLevel
             }).eq('id', matchId);
           };
 
@@ -1085,6 +1160,12 @@
             }).eq('id', matchId);
           };
 
+          const proposeLevelChange = async (choice) => {
+            setMyLevelChoice(choice);
+            const field = role === 'sender' ? 'level_change_choice_sender' : 'level_change_choice_receiver';
+            await supabase.from('telepathy_matches').update({ [field]: choice }).eq('id', matchId);
+          };
+
           // Poll for telepathy result when waiting
           useEffect(() => {
             if (!matchId || !waitingForPartner) return;
@@ -1094,6 +1175,38 @@
               if (!data || data.length === 0) return;
               const match = data[0];
 
+              // Sincronizza livello dal match
+              if (match.level && match.level !== currentLevel) {
+                setCurrentLevel(match.level);
+              }
+
+              // Gestisci proposta cambio livello (entrambi hanno scelto)
+              const senderChoice = match.level_change_choice_sender;
+              const receiverChoice = match.level_change_choice_receiver;
+              if (senderChoice && receiverChoice) {
+                if (senderChoice === receiverChoice && senderChoice !== 'continue') {
+                  setCurrentLevel(senderChoice);
+                  setRoundCount(0);
+                  setShowLevelBanner(false);
+                  setMyLevelChoice(null);
+                  await supabase.from('telepathy_matches').update({
+                    level: senderChoice,
+                    round_count: 0,
+                    level_change_choice_sender: null,
+                    level_change_choice_receiver: null
+                  }).eq('id', matchId);
+                } else {
+                  setShowLevelBanner(false);
+                  setMyLevelChoice(null);
+                  await supabase.from('telepathy_matches').update({
+                    level_change_choice_sender: null,
+                    level_change_choice_receiver: null
+                  }).eq('id', matchId);
+                }
+                return;
+              }
+
+              // Risultato round
               if (match.sender_symbol && match.receiver_guess) {
                 const isTelepathicMatch = match.sender_symbol === match.receiver_guess;
                 setPartnerSymbol(role === 'sender' ? match.receiver_guess : match.sender_symbol);
@@ -1101,6 +1214,31 @@
                 setShowResult(true);
                 setWaitingForPartner(false);
 
+                const newRound = (match.round_count || 0) + 1;
+                const newSessionMatches = sessionMatches + (isTelepathicMatch ? 1 : 0);
+                setRoundCount(newRound);
+                setSessionMatches(newSessionMatches);
+
+                // Solo il sender esegue la write al DB per evitare doppia scrittura
+                if (role === 'sender') {
+                  const scoreUpdate = {};
+                  if (isTelepathicMatch) {
+                    scoreUpdate.score_sender = (match.score_sender || 0) + 1;
+                  }
+                  await supabase.from('telepathy_matches').update({
+                    round_count: newRound,
+                    sender_symbol: null,
+                    receiver_guess: null,
+                    ...scoreUpdate
+                  }).eq('id', matchId);
+                } else if (role === 'receiver' && isTelepathicMatch) {
+                  // Il receiver aggiorna solo il proprio score nel DB
+                  await supabase.from('telepathy_matches').update({
+                    score_receiver: (match.score_receiver || 0) + 1
+                  }).eq('id', matchId);
+                }
+
+                // Score locale (entrambi aggiornano il proprio)
                 if (isTelepathicMatch) {
                   const newScore = telepathyScore + 10;
                   setTelepathyScore(newScore);
@@ -1110,13 +1248,105 @@
                     localStorage.setItem('telepathy_best', newScore);
                   }
                 }
+
+                // Suggerisci cambio livello ogni 7 round
+                if (newRound >= 7 && newRound % 7 === 0) {
+                  setShowLevelBanner(true);
+                }
               }
             };
 
             pollResult();
             const interval = setInterval(pollResult, 2000);
             return () => clearInterval(interval);
-          }, [matchId, waitingForPartner, role, telepathyScore, bestScore]);
+          }, [matchId, waitingForPartner, role, telepathyScore, bestScore, currentLevel, sessionMatches]);
+
+          // Poll per il cambio livello (gira tra i round quando showLevelBanner è true)
+          useEffect(() => {
+            if (!matchId || !showLevelBanner) return;
+
+            const pollLevelChange = async () => {
+              const { data } = await supabase.from('telepathy_matches').select('*').eq('id', matchId);
+              if (!data || data.length === 0) return;
+              const match = data[0];
+              const senderChoice = match.level_change_choice_sender;
+              const receiverChoice = match.level_change_choice_receiver;
+              if (!senderChoice || !receiverChoice) return;
+
+              const agreed = senderChoice === receiverChoice && senderChoice !== 'continue';
+              const newLevel = agreed ? senderChoice : currentLevel;
+
+              if (agreed) {
+                setCurrentLevel(newLevel);
+                setRoundCount(0);
+              }
+              setShowLevelBanner(false);
+              setMyLevelChoice(null);
+
+              const updatePayload = {
+                level: newLevel,
+                level_change_choice_sender: null,
+                level_change_choice_receiver: null
+              };
+              if (agreed) updatePayload.round_count = 0;
+
+              await supabase.from('telepathy_matches').update(updatePayload).eq('id', matchId);
+            };
+
+            pollLevelChange();
+            const interval = setInterval(pollLevelChange, 2000);
+            return () => clearInterval(interval);
+          }, [matchId, showLevelBanner, currentLevel]);
+
+          // Poll per match da invito diretto (l'invitante aspetta che l'altro accetti)
+          useEffect(() => {
+            if (!directInviteTarget || partner) return;
+
+            const pollForMatch = async () => {
+              const { data: matches } = await supabase.from('telepathy_matches').select('*');
+              if (!matches) return;
+              const myMatch = matches.find(m => m.user1_id === sessionId || m.user2_id === sessionId);
+              if (myMatch) {
+                const amUser1 = myMatch.user1_id === sessionId;
+                setPartner({ id: amUser1 ? myMatch.user2_id : myMatch.user1_id, nickname: amUser1 ? myMatch.user2_nickname : myMatch.user1_nickname });
+                setRole(amUser1 ? myMatch.user1_role : myMatch.user2_role);
+                setMatchId(myMatch.id);
+                setDirectInviteTarget(null);
+              }
+            };
+
+            pollForMatch();
+            const interval = setInterval(pollForMatch, 2000);
+            return () => clearInterval(interval);
+          }, [directInviteTarget, partner, sessionId]);
+
+          // Chat in-match telepatia
+          useEffect(() => {
+            if (!matchId) return;
+            const loadChat = async () => {
+              const { data } = await supabase.from('telepathy_chat').select('*').eq('match_id', matchId).order('created_at', { ascending: true });
+              if (data) setTelepathyChatMessages(data);
+            };
+            loadChat();
+            const interval = setInterval(loadChat, 2000);
+            return () => clearInterval(interval);
+          }, [matchId]);
+
+          // Receiver: controlla se il sender ha già inviato il simbolo
+          useEffect(() => {
+            if (!matchId || role !== 'receiver' || waitingForPartner || showResult) return;
+
+            const checkSenderSent = async () => {
+              const { data } = await supabase.from('telepathy_matches').select('sender_symbol').eq('id', matchId);
+              if (data && data.length > 0) {
+                setSenderHasSent(!!data[0].sender_symbol);
+              }
+            };
+
+            checkSenderSent();
+            const interval = setInterval(checkSenderSent, 2000);
+            return () => clearInterval(interval);
+          }, [matchId, role, waitingForPartner, showResult]);
 
           const resetTelepathy = () => {
             setPartner(null);
@@ -1127,6 +1357,77 @@
             setWaitingForPartner(false);
             setMatchId(null);
             setPartnerSymbol(null);
+            // nuovi state v2
+            setCurrentLevel('shapes');
+            setRoundCount(0);
+            setSessionMatches(0);
+            setShowLevelBanner(false);
+            setMyLevelChoice(null);
+            setSessionEnded(false);
+            setDirectInviteTarget(null);
+            setSenderHasSent(false);
+            setTelepathyChatMessages([]);
+            setNewTelepathyMessage('');
+          };
+
+          const sendDirectInvite = async (targetUser) => {
+            setDirectInviteTarget(targetUser);
+            const { error } = await supabase.from('telepathy_invites').insert({
+              from_id: sessionId,
+              from_name: nickname || 'Anonymous',
+              to_id: targetUser.id,
+              to_name: targetUser.nickname,
+              status: 'pending'
+            });
+            if (error) {
+              console.warn('Failed to send invite:', error);
+              setDirectInviteTarget(null);
+              return;
+            }
+          };
+
+          const acceptInvite = async () => {
+            if (!incomingInvite) return;
+            const myRole = Math.random() > 0.5 ? 'sender' : 'receiver';
+            const theirRole = myRole === 'sender' ? 'receiver' : 'sender';
+            const { data: matchData, error: matchError } = await supabase.from('telepathy_matches').insert({
+              user1_id: incomingInvite.from_id,
+              user1_nickname: incomingInvite.from_name,
+              user1_role: theirRole,
+              user2_id: sessionId,
+              user2_nickname: nickname || 'Anonymous',
+              user2_role: myRole,
+              level: 'shapes',
+              round_count: 0,
+              score_sender: 0,
+              score_receiver: 0
+            });
+            if (matchError) {
+              console.warn('Failed to create match:', matchError);
+              return;
+            }
+            await supabase.from('telepathy_invites').update({ status: 'accepted' }).eq('id', incomingInvite.invite_id);
+            if (matchData && matchData.length > 0) {
+              setMatchId(matchData[0].id);
+            }
+            setPartner({ id: incomingInvite.from_id, nickname: incomingInvite.from_name });
+            setRole(myRole);
+            setIncomingInvite(null);
+            setSearchingPartner(false);
+          };
+
+          const declineInvite = async () => {
+            if (!incomingInvite) return;
+            await supabase.from('telepathy_invites').update({ status: 'declined' }).eq('id', incomingInvite.invite_id);
+            setIncomingInvite(null);
+          };
+
+          const playAgainSamePartner = async () => {
+            const savedPartner = partner;
+            resetTelepathy();
+            if (savedPartner) {
+              await sendDirectInvite(savedPartner);
+            }
           };
 
           // Load profile from Supabase or localStorage
@@ -1186,6 +1487,52 @@
             localStorage.setItem('ga_profile', JSON.stringify(profile));
             setProfileSaved(true);
             setTimeout(() => setProfileSaved(false), 3000);
+          };
+
+          const sendTelepathyMessage = async () => {
+            if (!newTelepathyMessage.trim() || !matchId) return;
+            const msg = newTelepathyMessage.trim();
+            setNewTelepathyMessage('');
+            await supabase.from('telepathy_chat').insert({
+              match_id: matchId,
+              sender_name: nickname || 'Anonymous',
+              content: msg
+            });
+          };
+
+          const getPartnerStatus = () => {
+            if (!partner) return '';
+            if (showResult) return 'Round completato!';
+            if (role === 'sender') {
+              if (waitingForPartner) return `${partner.nickname} sta indovinando...`;
+              return `${partner.nickname} aspetta il tuo simbolo`;
+            } else {
+              if (waitingForPartner) return `In attesa del risultato...`;
+              if (senderHasSent) return `${partner.nickname} ha inviato! Indovina.`;
+              return `${partner.nickname} sta scegliendo...`;
+            }
+          };
+
+          const endSession = async () => {
+            try {
+              const userId = userEmail || sessionId;
+              const { data: existing } = await supabase.from('telepathy_scores').select('*').eq('user_id', userId);
+              const prev = (existing && existing.length > 0) ? existing[0] : { sessions_count: 0, matches_count: 0 };
+              await supabase.from('telepathy_scores').upsert({
+                user_id: userId,
+                nickname: nickname || 'Anonymous',
+                sessions_count: (prev.sessions_count || 0) + 1,
+                matches_count: (prev.matches_count || 0) + sessionMatches,
+                updated_at: new Date().toISOString()
+              });
+              if (matchId) {
+                await supabase.from('telepathy_matches').delete().eq('id', matchId);
+              }
+            } catch (err) {
+              console.warn('endSession error:', err);
+            } finally {
+              setSessionEnded(true);
+            }
           };
 
           const toggleInterest = (key) => {
@@ -1783,16 +2130,60 @@
                       <p className="text-primary">Develop your psychic abilities</p>
                     </div>
 
-                    {!partner && !searchingPartner && (
+                    {!partner && !searchingPartner && !sessionEnded && (
                       <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                        <div className="bg-glass-dark rounded-xl p-6" style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                          <h3 className="text-white font-bold mb-3">How it works:</h3>
-                          <p className="text-primary text-sm">1. Click 'Find Partner' to connect</p>
-                          <p className="text-primary text-sm">2. One sends a symbol, one receives</p>
-                          <p className="text-primary text-sm">3. Match correctly to earn points!</p>
+                        {/* Banner invito in arrivo */}
+                        {incomingInvite && (
+                          <div className="bg-glass-dark rounded-xl p-4" style={{border: '1px solid rgba(167,139,250,0.5)', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                            <p className="text-white font-bold">✨ {incomingInvite.from_name} ti vuole fare training telepatico!</p>
+                            <div style={{display: 'flex', gap: '0.75rem'}}>
+                              <button onClick={acceptInvite} className="btn-primary" style={{flex: 1}}>Accetta</button>
+                              <button onClick={declineInvite} className="btn-secondary" style={{flex: 1}}>Rifiuta</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Come funziona */}
+                        <div className="bg-glass-dark rounded-xl p-4">
+                          <h3 className="text-white font-bold mb-2">Come funziona:</h3>
+                          <p className="text-primary text-sm">1. Scegli un partner dalla lista o cerca uno random</p>
+                          <p className="text-primary text-sm">2. Uno invia un simbolo, l'altro lo riceve</p>
+                          <p className="text-primary text-sm">3. Dopo 7 round puoi cambiare tipo di gioco!</p>
                         </div>
+
+                        {/* Lista utenti online */}
+                        {onlineUsersForTelepathy.length > 0 && (
+                          <div className="bg-glass-dark rounded-xl p-4">
+                            <h3 className="text-white font-bold mb-3">Utenti online ({onlineUsersForTelepathy.length})</h3>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                              {onlineUsersForTelepathy.map(u => (
+                                <div key={u.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.05)'}}>
+                                  <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                    <span style={{width: '0.6rem', height: '0.6rem', borderRadius: '50%', background: u.status === 'available' ? '#4ade80' : '#9ca3af', display: 'inline-block'}} />
+                                    <span className="text-white text-sm font-medium">{u.nickname}</span>
+                                    <span className="text-secondary text-xs">{u.status === 'busy' ? 'in sessione' : 'disponibile'}</span>
+                                  </div>
+                                  {u.status === 'available' && directInviteTarget?.id !== u.id && (
+                                    <button
+                                      onClick={() => sendDirectInvite(u)}
+                                      className="btn-primary"
+                                      style={{fontSize: '0.75rem', padding: '0.3rem 0.75rem'}}
+                                    >
+                                      Proponi
+                                    </button>
+                                  )}
+                                  {directInviteTarget?.id === u.id && (
+                                    <span className="text-secondary text-xs">Invito inviato...</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Abbinamento random */}
                         <button onClick={startSearching} className="btn-primary w-full" style={{fontSize: '1.125rem'}}>
-                          Find Partner
+                          Abbinamento Random
                         </button>
                       </div>
                     )}
@@ -1811,105 +2202,184 @@
                       </div>
                     )}
 
-                    {partner && !showResult && (
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                        <div className="result-success rounded-xl p-4 text-center">
-                          <p style={{color: '#4ade80'}} className="font-bold">✨ Partner found!</p>
-                          <p className="text-white mt-2">
-                            Training with: <span className="font-bold text-yellow-300">{partner.nickname}</span>
-                          </p>
-                          <p className="text-secondary text-sm mt-1">Your role: <span className="font-bold text-white">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</span></p>
-                        </div>
+                    {(partner || sessionEnded) && (
+                      <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start'}}>
 
-                        {role === 'sender' && !waitingForPartner && (
-                          <div>
-                            <p className="text-white text-center mb-4 font-medium">Select a symbol to send:</p>
-                            <div className="grid grid-cols-3 gap-4 mb-6">
-                              {telepathySymbols.map((symbol) => (
-                                <button
-                                  key={symbol.id}
-                                  onClick={() => setSelectedSymbol(symbol.id)}
-                                  className={`symbol-btn ${selectedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}
-                                >
-                                  {symbol.icon}
-                                </button>
-                              ))}
-                            </div>
-                            <button onClick={sendSymbol} disabled={!selectedSymbol} className="btn-primary w-full">
-                              Send Telepathically
-                            </button>
+                        {/* SINISTRA: riepilogo sessione + status partner */}
+                        <div style={{flex: '0 0 180px', minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                          <div className="bg-glass-dark rounded-xl p-4">
+                            <p className="text-secondary text-xs mb-2">Con</p>
+                            <p className="text-white font-bold">{partner?.nickname}</p>
+                            <p className="text-secondary text-xs mt-1">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</p>
                           </div>
-                        )}
-
-                        {role === 'receiver' && !waitingForPartner && (
-                          <div>
-                            <p className="text-white text-center mb-4 font-medium">Which symbol do you receive?</p>
-                            <div className="grid grid-cols-3 gap-4 mb-6">
-                              {telepathySymbols.map((symbol) => (
-                                <button
-                                  key={symbol.id}
-                                  onClick={() => setGuessedSymbol(symbol.id)}
-                                  className={`symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}
-                                >
-                                  {symbol.icon}
-                                </button>
-                              ))}
+                          <div className="bg-glass-dark rounded-xl p-4" style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                              <span className="text-secondary text-xs">Round</span>
+                              <span className="text-white text-sm font-bold">{roundCount}</span>
                             </div>
-                            <button onClick={submitGuess} disabled={!guessedSymbol} className="btn-primary w-full">
-                              Submit
-                            </button>
-                          </div>
-                        )}
-
-                        {waitingForPartner && (
-                          <div className="text-center">
-                            <div style={{fontSize: '4rem'}} className="pulse-glow mb-4">🔮</div>
-                            <p className="text-primary">
-                              {role === 'sender' ? 'Symbol sent! Waiting for receiver to guess...' : 'Guess submitted! Waiting for sender to choose...'}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {showResult && (
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                        <div className={`${isMatch ? 'result-success' : 'result-try-again'} rounded-xl p-6 text-center`}>
-                          <div style={{fontSize: '4rem'}} className="mb-4">{isMatch ? '✨' : '🌟'}</div>
-                          <h3 className="text-2xl font-bold mb-2" style={{color: isMatch ? '#4ade80' : '#fb923c'}}>
-                            {isMatch ? '✨ TELEPATHIC MATCH! ✨' : 'Not this time. Keep practicing!'}
-                          </h3>
-                          <div className="flex justify-center gap-6 mb-3" style={{marginTop: '0.5rem'}}>
-                            <div className="text-center">
-                              <p className="text-secondary text-sm mb-1">Sent</p>
-                              <span style={{fontSize: '2.5rem'}}>{telepathySymbols.find(s => s.id === (role === 'sender' ? selectedSymbol : partnerSymbol))?.icon}</span>
+                            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                              <span className="text-secondary text-xs">Match</span>
+                              <span className="text-white text-sm font-bold">{sessionMatches}/{roundCount || 0}</span>
                             </div>
-                            <div className="text-center">
-                              <p className="text-secondary text-sm mb-1">Guessed</p>
-                              <span style={{fontSize: '2.5rem'}}>{telepathySymbols.find(s => s.id === (role === 'receiver' ? guessedSymbol : partnerSymbol))?.icon}</span>
+                            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                              <span className="text-secondary text-xs">Livello</span>
+                              <span className="text-white text-sm font-bold">{currentLevel === 'shapes' ? 'Figure' : currentLevel === 'numbers' ? 'Numeri' : 'Parole'}</span>
                             </div>
+                            {roundCount > 0 && (
+                              <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                <span className="text-secondary text-xs">Precisione</span>
+                                <span className="text-sm font-bold" style={{color: '#4ade80'}}>{Math.round((sessionMatches / roundCount) * 100)}%</span>
+                              </div>
+                            )}
                           </div>
-                          {isMatch && (
-                            <p className="text-white">
-                              You both earned <span className="font-bold" style={{color: '#fbbf24'}}>+10</span> points
-                            </p>
+                          {partner && !sessionEnded && (
+                            <div className="bg-glass-dark rounded-xl p-3">
+                              <p className="text-secondary text-xs mb-1">Stato</p>
+                              <p className="text-white text-xs">{getPartnerStatus()}</p>
+                            </div>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <button onClick={resetTelepathy} className="btn-secondary py-3 font-bold">
-                            Try Again
-                          </button>
-                          <button
-                            onClick={() => {
-                              resetTelepathy();
-                              startSearching();
-                            }}
-                            className="btn-primary"
-                          >
-                            New Partner
-                          </button>
+                        {/* CENTRO: area di gioco */}
+                        <div style={{flex: '1 1 280px', minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                          {partner && !showResult && !sessionEnded && (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                              {/* Banner proposta cambio livello */}
+                              {showLevelBanner && (
+                                <div className="bg-glass-dark rounded-xl p-4" style={{border: '1px solid rgba(167,139,250,0.5)'}}>
+                                  <p className="text-white font-bold text-center mb-3">Vuoi cambiare tipo di telepatia?</p>
+                                  {myLevelChoice ? (
+                                    <p className="text-secondary text-sm text-center">Hai scelto: <span className="text-white">{myLevelChoice === 'continue' ? 'Continua' : myLevelChoice === 'numbers' ? 'Numeri' : 'Parole'}</span>. Aspettando...</p>
+                                  ) : (
+                                    <div style={{display: 'flex', gap: '0.5rem'}}>
+                                      <button onClick={() => proposeLevelChange('numbers')} className="btn-secondary" style={{flex: 1, fontSize: '0.85rem'}}>🔢 Numeri</button>
+                                      <button onClick={() => proposeLevelChange('words')} className="btn-secondary" style={{flex: 1, fontSize: '0.85rem'}}>💬 Parole</button>
+                                      <button onClick={() => proposeLevelChange('continue')} className="btn-secondary" style={{flex: 1, fontSize: '0.85rem'}}>Continua</button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {role === 'sender' && !waitingForPartner && (
+                                <div>
+                                  <p className="text-white text-center mb-4 font-medium">Scegli il simbolo da inviare:</p>
+                                  <div className="grid grid-cols-3 gap-4 mb-6">
+                                    {getCurrentSymbols(currentLevel).map((symbol) => (
+                                      <button key={symbol.id} onClick={() => setSelectedSymbol(symbol.id)} className={`symbol-btn ${selectedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}>
+                                        {symbol.icon}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button onClick={sendSymbol} disabled={!selectedSymbol} className="btn-primary w-full">Invia Telepaticamente</button>
+                                </div>
+                              )}
+
+                              {role === 'receiver' && !waitingForPartner && (
+                                <div>
+                                  {senderHasSent ? (
+                                    <p className="text-white text-center mb-4 font-medium">✨ Simbolo inviato! Quale ricevi?</p>
+                                  ) : (
+                                    <p className="text-white text-center mb-4 font-medium">In attesa dell'invio... puoi già scegliere.</p>
+                                  )}
+                                  <div className="grid grid-cols-3 gap-4 mb-6">
+                                    {getCurrentSymbols(currentLevel).map((symbol) => (
+                                      <button key={symbol.id} onClick={() => setGuessedSymbol(symbol.id)} className={`symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}>
+                                        {symbol.icon}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button onClick={submitGuess} disabled={!guessedSymbol} className="btn-primary w-full">Conferma</button>
+                                </div>
+                              )}
+
+                              {waitingForPartner && (
+                                <div className="text-center">
+                                  <div style={{fontSize: '4rem'}} className="pulse-glow mb-4">🔮</div>
+                                  <p className="text-primary">
+                                    {role === 'sender' ? 'Simbolo inviato! In attesa che il receiver indovini...' : 'Risposta inviata! In attesa del sender...'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {showResult && (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                              <div className={`${isMatch ? 'result-success' : 'result-try-again'} rounded-xl p-6 text-center`}>
+                                <div style={{fontSize: '4rem'}} className="mb-4">{isMatch ? '✨' : '🌟'}</div>
+                                <h3 className="text-2xl font-bold mb-2" style={{color: isMatch ? '#4ade80' : '#fb923c'}}>
+                                  {isMatch ? '✨ MATCH TELEPATICO! ✨' : 'Non questa volta. Continua!'}
+                                </h3>
+                                <div className="flex justify-center gap-6 mb-3" style={{marginTop: '0.5rem'}}>
+                                  <div className="text-center">
+                                    <p className="text-secondary text-sm mb-1">Inviato</p>
+                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(currentLevel).find(s => s.id === (role === 'sender' ? selectedSymbol : partnerSymbol))?.icon}</span>
+                                  </div>
+                                  <div className="text-center">
+                                    <p className="text-secondary text-sm mb-1">Indovinato</p>
+                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(currentLevel).find(s => s.id === (role === 'receiver' ? guessedSymbol : partnerSymbol))?.icon}</span>
+                                  </div>
+                                </div>
+                                {isMatch && <p className="text-white">Entrambi +<span className="font-bold" style={{color: '#fbbf24'}}>10</span> punti</p>}
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => { setShowResult(false); setSelectedSymbol(null); setGuessedSymbol(null); setPartnerSymbol(null); setWaitingForPartner(false); }} className="btn-secondary py-3 font-bold">Ancora</button>
+                                <button onClick={() => { resetTelepathy(); startSearching(); }} className="btn-primary">Nuovo Partner</button>
+                              </div>
+                              <button onClick={endSession} className="btn-secondary w-full" style={{fontSize: '0.85rem'}}>Termina Sessione</button>
+                            </div>
+                          )}
+
+                          {sessionEnded && (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                              <div className="bg-glass-dark rounded-xl p-6 text-center">
+                                <div style={{fontSize: '4rem'}} className="mb-4">🌟</div>
+                                <h3 className="text-2xl font-bold text-white mb-4">Sessione Completata!</h3>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div><p className="text-secondary text-sm mb-1">Round giocati</p><p className="text-2xl font-bold text-white">{roundCount}</p></div>
+                                  <div><p className="text-secondary text-sm mb-1">Match corretti</p><p className="text-2xl font-bold" style={{color: '#4ade80'}}>{sessionMatches}</p></div>
+                                </div>
+                                {roundCount > 0 && <p className="text-white">Precisione: <span className="font-bold" style={{color: '#fbbf24'}}>{Math.round((sessionMatches / roundCount) * 100)}%</span></p>}
+                              </div>
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                                <button onClick={playAgainSamePartner} className="btn-primary w-full">Altra sessione con {partner?.nickname}</button>
+                                <button onClick={resetTelepathy} className="btn-secondary w-full">Torna alla Lobby</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
+
+                        {/* DESTRA: chat con il partner */}
+                        {partner && !sessionEnded && (
+                          <div style={{flex: '0 0 200px', minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                            <div className="bg-glass-dark rounded-xl p-3">
+                              <p className="text-white text-sm font-bold mb-2">💬 Chat con {partner.nickname}</p>
+                              <div style={{height: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem'}}>
+                                {telepathyChatMessages.length === 0 && (
+                                  <p className="text-secondary text-xs text-center" style={{marginTop: '2rem'}}>Nessun messaggio ancora</p>
+                                )}
+                                {telepathyChatMessages.map(msg => (
+                                  <div key={msg.id} style={{padding: '0.3rem 0.5rem', borderRadius: '0.5rem', background: msg.sender_name === nickname ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.08)', alignSelf: msg.sender_name === nickname ? 'flex-end' : 'flex-start', maxWidth: '90%'}}>
+                                    {msg.sender_name !== nickname && <p className="text-secondary" style={{fontSize: '0.65rem'}}>{msg.sender_name}</p>}
+                                    <p className="text-white" style={{fontSize: '0.8rem'}}>{msg.content}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{display: 'flex', gap: '0.25rem'}}>
+                                <input
+                                  type="text"
+                                  value={newTelepathyMessage}
+                                  onChange={e => setNewTelepathyMessage(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && sendTelepathyMessage()}
+                                  placeholder="Scrivi..."
+                                  style={{flex: 1, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '0.5rem', padding: '0.3rem 0.5rem', color: 'white', fontSize: '0.8rem', outline: 'none'}}
+                                />
+                                <button onClick={sendTelepathyMessage} style={{background: 'rgba(139,92,246,0.5)', border: 'none', borderRadius: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', color: 'white', fontSize: '0.85rem'}}>➤</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                       </div>
                     )}
                   </div>
