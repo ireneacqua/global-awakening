@@ -921,11 +921,21 @@
                       busyIds.add(m.user2_id);
                     });
                   }
-                  const usersWithStatus = (data || []).map(u => ({
+                  // Deduplica per nickname: tieni solo il record più recente per persona
+                  const sortedByDate = (data || []).slice().sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
+                  const seenNicks = new Set();
+                  const uniqueUsers = [];
+                  for (const u of sortedByDate) {
+                    if (!seenNicks.has(u.nickname)) {
+                      seenNicks.add(u.nickname);
+                      uniqueUsers.push(u);
+                    }
+                  }
+                  const usersWithStatus = uniqueUsers.map(u => ({
                     ...u,
                     status: busyIds.has(u.id) ? 'busy' : 'available'
                   }));
-                  setOnlineUsersForTelepathy(usersWithStatus.filter(u => u.id !== sessionId && u.nickname !== nickname));
+                  setOnlineUsersForTelepathy(usersWithStatus.filter(u => u.nickname !== nickname));
 
                   // Controlla inviti in arrivo
                   const { data: invites } = await supabase.from('telepathy_invites')
