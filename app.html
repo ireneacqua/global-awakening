@@ -126,7 +126,7 @@
         }
         .ripple { animation: ripple 2s ease-out infinite; }
         
-        .bg-gradient { background: linear-gradient(135deg, #312e81 0%, #7c3aed 50%, #db2777 100%); }
+        .bg-gradient { background: transparent; }
         .bg-glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); }
         .bg-glass-dark { background: rgba(255, 255, 255, 0.05); }
         .border-glass { border: 1px solid rgba(255, 255, 255, 0.2); }
@@ -399,9 +399,83 @@
             .symbol-btn { font-size: 3rem; padding: 1rem; }
             .map-container { height: 400px; }
         }
+
+        @media (max-width: 640px) {
+            /* Header: wrap su due righe su schermi stretti */
+            .header-inner { flex-wrap: wrap; gap: 0.35rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .header-left h1 { font-size: 1rem; }
+            .header-left p  { display: none; }
+            .header-right { gap: 0.35rem; }
+            .header-right .btn-secondary { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        }
     </style>
 </head>
 <body>
+<canvas id="starfield" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+
+  // Colore di sfondo quasi nero con lieve tinta blu-verde (come nel riferimento)
+  const BG = '#0c0f14';
+
+  const STAR_COUNT = 220;
+  let stars = [];
+  let W, H;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const r = Math.random();
+      // 80% piccole (0.5-1.2px), 15% medie (1.5-2.5px), 5% grandi (3-4px)
+      const size = r < 0.80 ? 0.5 + Math.random() * 0.7
+                 : r < 0.95 ? 1.5 + Math.random() * 1.0
+                 :             3.0 + Math.random() * 1.0;
+      const brightness = 0.4 + Math.random() * 0.6;
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size,
+        brightness,
+        twinkleSpeed: 0.002 + Math.random() * 0.006,
+        twinkleOffset: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  function draw(t) {
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const s of stars) {
+      const flicker = 0.75 + 0.25 * Math.sin(t * s.twinkleSpeed + s.twinkleOffset);
+      const alpha = s.brightness * flicker;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      // Stelle grandi: sfumatura leggermente azzurrina (come nel riferimento)
+      if (s.size > 2) {
+        ctx.fillStyle = `rgba(180, 220, 240, ${alpha})`;
+      } else {
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      }
+      ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); initStars(); });
+  resize();
+  initStars();
+  requestAnimationFrame(draw);
+})();
+</script>
     <div id="root"></div>
     
     <script type="text/babel">
@@ -1891,15 +1965,15 @@
             <div className="min-h-screen bg-gradient">
               <header className="sticky top-0 bg-glass border-b z-50">
                 <div className="container">
-                  <div className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
+                  <div className="header-inner flex items-center justify-between py-3">
+                    <div className="header-left flex items-center gap-3">
                       <Star style={{width: '2rem', height: '2rem', color: '#fbbf24'}} />
                       <div>
                         <h1 className="text-xl font-bold text-white">{t.title}</h1>
                         <p className="text-primary text-xs">{t.subtitle}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="header-right flex items-center gap-3">
                       <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary px-3 py-2">
                         {lang === 'en' ? 'IT' : 'EN'}
                       </button>
@@ -1960,10 +2034,10 @@
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`py-2 px-4 rounded-xl font-medium transition-all ${
+                      className={`py-2 px-3 rounded-xl font-medium transition-all ${
                         activeTab === tab ? 'tab-active' : 'tab-inactive'
                       }`}
-                      style={{whiteSpace: 'nowrap', flex: '0 0 auto'}}
+                      style={{whiteSpace: 'nowrap', flex: '1', textAlign: 'center', fontSize: 'clamp(0.75rem, 2.5vw, 1rem)'}}
                     >
                       {t.tabs[tab]}
                     </button>
