@@ -2262,16 +2262,22 @@
                               <p style={{color: '#a78bfa', fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem'}}>Nessuna notifica</p>
                             ) : (
                               <>
-                                {notifItems.map(n => (
-                                  <div key={n.id} style={{
+                                {notifItems.map(n => {
+                                  const tabTarget = n.type === 'telepathy_invite' ? 'telepathy' : n.type === 'comment' ? 'consciousness' : 'rituals';
+                                  return (
+                                  <div key={n.id} onClick={() => { setActiveTab(tabTarget); setShowNotifPanel(false); markNotifsRead(); }} style={{
                                     padding: '0.5rem 0.25rem',
                                     borderBottom: '1px solid rgba(255,255,255,0.06)',
-                                    color: '#e5e7eb', fontSize: '0.85rem', display: 'flex', gap: '0.5rem'
-                                  }}>
+                                    color: '#e5e7eb', fontSize: '0.85rem', display: 'flex', gap: '0.5rem',
+                                    cursor: 'pointer', borderRadius: '0.4rem'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.background = 'rgba(124,58,237,0.15)'}
+                                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                  >
                                     <span>{n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
                                     <span>{n.message}</span>
-                                  </div>
-                                ))}
+                                  </div>);
+                                })}
                                 <button onClick={markNotifsRead} className="btn-primary" style={{width: '100%', marginTop: '0.75rem', fontSize: '0.8rem'}}>
                                   Segna come lette
                                 </button>
