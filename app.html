@@ -925,7 +925,7 @@
                     ...u,
                     status: busyIds.has(u.id) ? 'busy' : 'available'
                   }));
-                  setOnlineUsersForTelepathy(usersWithStatus.filter(u => u.id !== sessionId));
+                  setOnlineUsersForTelepathy(usersWithStatus.filter(u => u.id !== sessionId && u.nickname !== nickname));
 
                   // Controlla inviti in arrivo
                   const { data: invites } = await supabase.from('telepathy_invites')
