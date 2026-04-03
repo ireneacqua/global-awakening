@@ -631,6 +631,18 @@
               create: "Create Ritual",
               cancel: "Cancel"
             },
+            feed: {
+              title: "Consciousness Feed",
+              subtitle: "Share your thoughts with the community",
+              newPostPlaceholder: "What's on your mind? Share your awakening...",
+              post: "Post",
+              comment: "Comment",
+              comments: "comments",
+              addComment: "Add a comment...",
+              noFeed: "No posts yet. Be the first to share!",
+              showComments: "Show comments",
+              hideComments: "Hide comments"
+            },
             map: {
               title: "Global Network",
               subtitle: "Starseeds awakening together",
@@ -749,6 +761,18 @@
               create: "Crea Rituale",
               cancel: "Annulla"
             },
+            feed: {
+              title: "Feed Coscienza",
+              subtitle: "Condividi i tuoi pensieri con la comunità",
+              newPostPlaceholder: "Cosa hai in mente? Condividi il tuo risveglio...",
+              post: "Pubblica",
+              comment: "Commenta",
+              comments: "commenti",
+              addComment: "Aggiungi un commento...",
+              noFeed: "Nessun post ancora. Sii il primo a condividere!",
+              showComments: "Mostra commenti",
+              hideComments: "Nascondi commenti"
+            },
             map: {
               title: "Rete Globale",
               subtitle: "Starseeds che si risvegliano insieme",
@@ -830,6 +854,14 @@
           const [unreadCount, setUnreadCount] = useState(0);
 
           const [rituals, setRituals] = useState([]);
+          const [posts, setPosts] = useState([]);
+          const [commentsMap, setCommentsMap] = useState({});
+          const [expandedPostId, setExpandedPostId] = useState(null);
+          const [newPostContent, setNewPostContent] = useState('');
+          const [newCommentContents, setNewCommentContents] = useState({});
+          const expandedPostIdRef = React.useRef(null);
+          const [notifItems, setNotifItems] = useState([]);
+          const [showNotifPanel, setShowNotifPanel] = useState(false);
           const [showCreateRitual, setShowCreateRitual] = useState(false);
           const [newRitual, setNewRitual] = useState({
             name: '',
@@ -841,6 +873,8 @@
             duration: 30
           });
           
+          React.useEffect(() => { expandedPostIdRef.current = expandedPostId; }, [expandedPostId]);
+
           const [sessionId, setSessionId] = useState(() => localStorage.getItem('ga_session_id') || (Date.now() + '-' + Math.random()));
           const [tempPassword, setTempPassword] = useState('');
           const [tempEmail, setTempEmail] = useState('');
@@ -993,7 +1027,25 @@
               if (messages) setChatMessages(messages);
               
               const { data: ritualsData } = await supabase.from('rituals').select('*').order('created_at', { ascending: false });
-              if (ritualsData) setRituals(ritualsData);
+              if (ritualsData) {
+                const now = new Date();
+                const expired = ritualsData.filter(r => {
+                  const endTime = new Date(new Date(`${r.date}T${r.time}Z`).getTime() + r.duration * 60000);
+                  return now > endTime;
+                });
+                for (const r of expired) {
+                  await supabase.from('rituals').delete().eq('id', r.id);
+                }
+                setRituals(ritualsData.filter(r => !expired.find(e => e.id === r.id)));
+              }
+
+              const { data: postsData } = await supabase.from('consciousness_posts').select('*').order('created_at', { ascending: false }).limit(50);
+              if (postsData) setPosts(postsData);
+
+              if (expandedPostIdRef.current) {
+                const { data: commentsData } = await supabase.from('consciousness_comments').select('*').eq('post_id', expandedPostIdRef.current).order('created_at', { ascending: true });
+                if (commentsData) setCommentsMap(prev => ({ ...prev, [expandedPostIdRef.current]: commentsData }));
+              }
             };
             
             loadData();
@@ -1540,6 +1592,11 @@
               setDirectInviteTarget(null);
               return;
             }
+            await supabase.from('notifications').insert({
+              user_nickname: targetUser.nickname,
+              type: 'telepathy_invite',
+              message: `${nickname} ti ha invitato a un training telepatico`
+            });
           };
 
           const acceptInvite = async () => {
@@ -1770,6 +1827,28 @@
             return () => clearInterval(interval);
           }, [nickname]);
 
+          useEffect(() => {
+            if (!nickname) return;
+            const loadNotifications = async () => {
+              const { data } = await supabase.from('notifications').select('*')
+                .eq('user_nickname', nickname).eq('read', false).order('created_at', { ascending: false });
+              if (data) setNotifItems(data);
+            };
+            loadNotifications();
+            const interval = setInterval(loadNotifications, 5000);
+            return () => clearInterval(interval);
+          }, [nickname]);
+
+          const markNotifsRead = async () => {
+            if (notifItems.length === 0) return;
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/notifications?user_nickname=eq.${encodeURIComponent(nickname)}&read=eq.false`,
+              { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ read: true }) }
+            );
+            setNotifItems([]);
+            setShowNotifPanel(false);
+          };
+
           const getConversationMessages = (otherUser) => {
             return privateMessages.filter(m =>
               (m.sender_name === nickname && m.receiver_name === otherUser) ||
@@ -1842,13 +1921,38 @@
             });
           };
 
+          const createTestRitual = async () => {
+            const now = new Date();
+            const utcDate = now.toISOString().slice(0, 10);
+            const utcTime = now.toISOString().slice(11, 16);
+            await supabase.from('rituals').insert({
+              creator: nickname || 'Anonymous',
+              creator_id: sessionId,
+              name: '⚡ Test Ritual',
+              description: 'Rituale di test — scade in 3 minuti',
+              type: 'consciousness',
+              sacred_number: 11,
+              date: utcDate,
+              time: utcTime,
+              duration: 3,
+              participants: [sessionId],
+              energy: 0
+            });
+          };
+
           const joinRitual = async (ritualId) => {
             const ritual = rituals.find(r => r.id === ritualId);
             if (!ritual || ritual.participants.includes(sessionId)) return;
-            
             await supabase.from('rituals').update({
               participants: [...ritual.participants, sessionId]
             }).eq('id', ritualId);
+            if (ritual.creator && ritual.creator !== nickname) {
+              await supabase.from('notifications').insert({
+                user_nickname: ritual.creator,
+                type: 'ritual_join',
+                message: `${nickname} si è unito/a al tuo rituale "${ritual.name}"`
+              });
+            }
           };
 
           const sendEnergy = async (ritualId) => {
@@ -1874,6 +1978,47 @@
             
             if (hours > 0) return `${hours}h ${minutes}m`;
             return `${minutes}m`;
+          };
+
+          const createPost = async () => {
+            if (!newPostContent.trim()) return;
+            await supabase.from('consciousness_posts').insert({
+              author_nickname: nickname,
+              content: newPostContent.trim()
+            });
+            setNewPostContent('');
+          };
+
+          const togglePostComments = async (postId) => {
+            if (expandedPostId === postId) {
+              setExpandedPostId(null);
+              return;
+            }
+            setExpandedPostId(postId);
+            const { data } = await supabase.from('consciousness_comments').select('*').eq('post_id', postId).order('created_at', { ascending: true });
+            if (data) setCommentsMap(prev => ({ ...prev, [postId]: data }));
+          };
+
+          const createComment = async (postId) => {
+            const content = (newCommentContents[postId] || '').trim();
+            if (!content) return;
+            const { data } = await supabase.from('consciousness_comments').insert({
+              post_id: postId,
+              author_nickname: nickname,
+              content
+            });
+            if (data && data.length > 0) {
+              setCommentsMap(prev => ({ ...prev, [postId]: [...(prev[postId] || []), ...data] }));
+              setNewCommentContents(prev => ({ ...prev, [postId]: '' }));
+              const post = posts.find(p => p.id === postId);
+              if (post && post.author_nickname !== nickname) {
+                await supabase.from('notifications').insert({
+                  user_nickname: post.author_nickname,
+                  type: 'comment',
+                  message: `${nickname} ha commentato il tuo post`
+                });
+              }
+            }
           };
 
           if (showNicknamePrompt) {
@@ -2048,6 +2193,53 @@
                           {unreadCount} 💬
                         </span>
                       )}
+                      <div style={{position: 'relative'}}>
+                        <button
+                          onClick={() => setShowNotifPanel(p => !p)}
+                          className="btn-secondary px-3 py-2"
+                          style={{fontSize: '0.8rem', position: 'relative'}}
+                        >
+                          🔔{notifItems.length > 0 && (
+                            <span style={{
+                              position: 'absolute', top: '-4px', right: '-4px',
+                              background: '#ef4444', color: '#fff',
+                              borderRadius: '9999px', fontSize: '0.6rem',
+                              fontWeight: 700, minWidth: '16px', height: '16px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              padding: '0 3px'
+                            }}>{notifItems.length}</span>
+                          )}
+                        </button>
+                        {showNotifPanel && (
+                          <div style={{
+                            position: 'absolute', right: 0, top: '2.5rem',
+                            width: '300px', background: '#1a1d2e',
+                            border: '1px solid rgba(124,58,237,0.35)',
+                            borderRadius: '0.75rem', padding: '0.75rem',
+                            zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                          }}>
+                            {notifItems.length === 0 ? (
+                              <p style={{color: '#a78bfa', fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem'}}>Nessuna notifica</p>
+                            ) : (
+                              <>
+                                {notifItems.map(n => (
+                                  <div key={n.id} style={{
+                                    padding: '0.5rem 0.25rem',
+                                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                                    color: '#e5e7eb', fontSize: '0.85rem', display: 'flex', gap: '0.5rem'
+                                  }}>
+                                    <span>{n.type === 'comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : '🧠'}</span>
+                                    <span>{n.message}</span>
+                                  </div>
+                                ))}
+                                <button onClick={markNotifsRead} className="btn-primary" style={{width: '100%', marginTop: '0.75rem', fontSize: '0.8rem'}}>
+                                  Segna come lette
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <button onClick={handleLogout} className="btn-secondary px-3 py-2" style={{fontSize: '0.8rem'}}>
                         {t.logout}
                       </button>
@@ -2100,9 +2292,14 @@
                         <h2 className="text-3xl font-bold text-white mb-2">{t.rituals.title}</h2>
                         <p className="text-primary">{t.rituals.subtitle}</p>
                       </div>
-                      <button onClick={() => setShowCreateRitual(true)} className="btn-primary">
-                        {t.rituals.createRitual}
-                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={createTestRitual} className="btn-secondary" style={{fontSize: '0.8rem'}}>
+                          ⚡ Test (3 min)
+                        </button>
+                        <button onClick={() => setShowCreateRitual(true)} className="btn-primary">
+                          {t.rituals.createRitual}
+                        </button>
+                      </div>
                     </div>
 
                     {rituals.length === 0 && (
@@ -2169,51 +2366,104 @@
 
                 {activeTab === 'consciousness' && (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                    {/* Chat Section */}
-                    <div className="bg-glass rounded-2xl border-glass chat-container" style={{height: '400px'}}>
-                      <div className="p-4 border-b">
-                        <h2 className="text-2xl font-bold text-white">Global Chat</h2>
-                        <p className="text-primary text-sm">{onlineUsers.length} starseeds online</p>
+
+                    {/* Feed Section */}
+                    <div>
+                      <div className="mb-4">
+                        <h2 className="text-3xl font-bold text-white mb-2">{t.feed.title}</h2>
+                        <p className="text-primary">{t.feed.subtitle}</p>
                       </div>
 
-                      <div className="chat-messages">
-                        {chatMessages.length === 0 && (
-                          <div className="text-center text-primary py-8">
-                            No messages yet. Start the conversation!
-                          </div>
-                        )}
-                        {chatMessages.map((msg) => (
-                          <div key={msg.id} className="chat-message">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span
-                                className="text-primary font-medium text-sm"
-                                style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
-                                onClick={() => openProfile(msg.user_name)}
-                              >
-                                {msg.user_name}
-                              </span>
-                              <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(msg.created_at).toLocaleTimeString()}</span>
-                            </div>
-                            <p className="text-white">{msg.content}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="p-4 border-t">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-                            placeholder="Share your message..."
-                            style={{flex: 1}}
-                          />
-                          <button onClick={sendChatMessage} className="btn-primary px-6 py-3">
-                            <Send style={{width: '1.25rem', height: '1.25rem'}} />
+                      {/* New post form */}
+                      <div className="bg-glass rounded-2xl border-glass p-4 mb-4">
+                        <textarea
+                          value={newPostContent}
+                          onChange={(e) => setNewPostContent(e.target.value)}
+                          placeholder={t.feed.newPostPlaceholder}
+                          rows={3}
+                          style={{width: '100%', resize: 'vertical', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', padding: '0.75rem', fontSize: '0.95rem'}}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) createPost(); }}
+                        />
+                        <div style={{textAlign: 'right'}}>
+                          <button onClick={createPost} className="btn-primary" disabled={!newPostContent.trim()}>
+                            {t.feed.post}
                           </button>
                         </div>
                       </div>
+
+                      {/* Posts list */}
+                      {posts.length === 0 && (
+                        <div className="bg-glass rounded-2xl p-10 text-center border-glass">
+                          <div style={{fontSize: '3rem'}} className="mb-3">💭</div>
+                          <p className="text-white">{t.feed.noFeed}</p>
+                        </div>
+                      )}
+
+                      {posts.map(post => {
+                        const postComments = commentsMap[post.id] || [];
+                        const isExpanded = expandedPostId === post.id;
+                        return (
+                          <div key={post.id} className="bg-glass rounded-2xl border-glass p-4 mb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className="text-primary font-medium text-sm"
+                                style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
+                                onClick={() => openProfile(post.author_nickname)}
+                              >{post.author_nickname}</span>
+                              <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(post.created_at).toLocaleString()}</span>
+                            </div>
+                            <p className="text-white" style={{marginBottom: '0.75rem', lineHeight: '1.5'}}>{post.content}</p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => togglePostComments(post.id)}
+                                className="btn-secondary"
+                                style={{fontSize: '0.8rem', padding: '0.3rem 0.85rem'}}
+                              >
+                                {isExpanded ? t.feed.hideComments : t.feed.showComments}
+                                {postComments.length > 0 ? ` (${postComments.length})` : ''}
+                              </button>
+                              <button
+                                onClick={() => togglePostComments(post.id)}
+                                className="btn-primary"
+                                style={{fontSize: '0.8rem', padding: '0.3rem 0.85rem'}}
+                              >
+                                {t.feed.comment}
+                              </button>
+                            </div>
+
+                            {isExpanded && (
+                              <div style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)'}}>
+                                {postComments.map(c => (
+                                  <div key={c.id} style={{marginBottom: '0.75rem', paddingLeft: '1rem', borderLeft: '2px solid rgba(124,58,237,0.4)'}}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span
+                                        className="text-primary font-medium text-xs"
+                                        style={{cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)'}}
+                                        onClick={() => openProfile(c.author_nickname)}
+                                      >{c.author_nickname}</span>
+                                      <span style={{color: '#c4b5fd'}} className="text-xs">{new Date(c.created_at).toLocaleTimeString()}</span>
+                                    </div>
+                                    <p className="text-white" style={{fontSize: '0.9rem'}}>{c.content}</p>
+                                  </div>
+                                ))}
+                                <div className="flex gap-2" style={{marginTop: '0.75rem'}}>
+                                  <input
+                                    type="text"
+                                    value={newCommentContents[post.id] || ''}
+                                    onChange={(e) => setNewCommentContents(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                    onKeyPress={(e) => e.key === 'Enter' && createComment(post.id)}
+                                    placeholder={t.feed.addComment}
+                                    style={{flex: 1, fontSize: '0.875rem'}}
+                                  />
+                                  <button onClick={() => createComment(post.id)} className="btn-primary px-4 py-2" style={{fontSize: '0.85rem'}}>
+                                    {t.feed.comment}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Map Section */}
