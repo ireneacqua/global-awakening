@@ -807,6 +807,7 @@
           const [roundCount, setRoundCount] = useState(0);
           const [sessionMatches, setSessionMatches] = useState(0);
           const [showLevelBanner, setShowLevelBanner] = useState(false);
+          const [levelDisagreement, setLevelDisagreement] = useState(null); // { myChoice, theirChoice }
           const [myLevelChoice, setMyLevelChoice] = useState(null); // scelta fatta dall'utente locale
           const [sessionEnded, setSessionEnded] = useState(false); // mostra schermata fine sessione
           const [partnerDisconnected, setPartnerDisconnected] = useState(false); // partner ha chiuso il tab
@@ -1309,11 +1310,17 @@
                     level_change_choice_receiver: null
                   }).eq('id', matchId);
                 } else {
+                  // Disaccordo — mostra messaggio e resetta round_count
+                  const myChoice = role === 'sender' ? senderChoice : receiverChoice;
+                  const theirChoice = role === 'sender' ? receiverChoice : senderChoice;
+                  setLevelDisagreement({ myChoice, theirChoice });
                   setShowLevelBanner(false);
                   setMyLevelChoice(null);
+                  setRoundCount(0);
                   await supabase.from('telepathy_matches').update({
                     level_change_choice_sender: null,
-                    level_change_choice_receiver: null
+                    level_change_choice_receiver: null,
+                    round_count: 0
                   }).eq('id', matchId);
                 }
                 return;
@@ -1512,6 +1519,7 @@
             setMyLevelChoice(null);
             setSessionEnded(false);
             setPartnerDisconnected(false);
+            setLevelDisagreement(null);
             setDirectInviteTarget(null);
             setSenderHasSent(false);
             setTelepathyChatMessages([]);
@@ -2359,6 +2367,16 @@
                             <p className="text-white font-bold mb-2">Il tuo partner si è disconnesso</p>
                             <p className="text-secondary text-sm mb-4">La connessione con {partner?.nickname || 'il partner'} è stata interrotta.</p>
                             <button onClick={resetTelepathy} className="btn-primary">Torna alla lobby</button>
+                          </div>
+                        )}
+
+                        {levelDisagreement && (
+                          <div style={{width: '100%', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '0.75rem', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.5rem'}}>
+                            <div>
+                              <p className="text-white font-bold text-sm">Scelte diverse — si continua con {currentLevel === 'shapes' ? '🔷 Figure' : currentLevel === 'numbers' ? '🔢 Numeri' : '💬 Parole'}</p>
+                              <p className="text-secondary text-xs mt-1">Tu: <strong>{levelDisagreement.myChoice}</strong> · Partner: <strong>{levelDisagreement.theirChoice}</strong></p>
+                            </div>
+                            <button onClick={() => setLevelDisagreement(null)} className="btn-secondary" style={{fontSize: '0.75rem', padding: '0.25rem 0.6rem', whiteSpace: 'nowrap'}}>Ok</button>
                           </div>
                         )}
 
