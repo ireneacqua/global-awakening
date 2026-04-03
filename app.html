@@ -723,6 +723,8 @@
           const [guessedSymbol, setGuessedSymbol] = useState(null);
           const [waitingForPartner, setWaitingForPartner] = useState(false);
           const [showResult, setShowResult] = useState(false);
+          // Tiene traccia dell'ultimo round_count processato per evitare doppio processing
+          const lastProcessedRoundRef = React.useRef(-1);
           const [isMatch, setIsMatch] = useState(false);
           const [matchId, setMatchId] = useState(null);
           const [partnerSymbol, setPartnerSymbol] = useState(null);
@@ -1174,7 +1176,11 @@
 
             const pollResult = async () => {
               const { data } = await supabase.from('telepathy_matches').select('*').eq('id', matchId);
-              if (!data || data.length === 0) return;
+              if (!data || data.length === 0) {
+                // Il partner ha abbandonato la sessione
+                resetTelepathy();
+                return;
+              }
               const match = data[0];
 
               // Sincronizza livello dal match
@@ -1208,8 +1214,10 @@
                 return;
               }
 
-              // Risultato round
-              if (match.sender_symbol && match.receiver_guess) {
+              // Risultato round — processa solo se è un round nuovo (round_count avanzato)
+              const dbRound = match.round_count || 0;
+              if (match.sender_symbol && match.receiver_guess && dbRound > lastProcessedRoundRef.current) {
+                lastProcessedRoundRef.current = dbRound;
                 const isTelepathicMatch = match.sender_symbol === match.receiver_guess;
                 setPartnerSymbol(role === 'sender' ? match.receiver_guess : match.sender_symbol);
                 setIsMatch(isTelepathicMatch);
@@ -1221,20 +1229,27 @@
                 setRoundCount(newRound);
                 setSessionMatches(newSessionMatches);
 
-                // Solo il sender esegue la write al DB per evitare doppia scrittura
+                // Solo il sender esegue la write al DB per evitare doppia scrittura.
+                // Aspetta 4s prima di cancellare i simboli, così il receiver
+                // ha tempo di pollare e vedere il risultato.
                 if (role === 'sender') {
                   const scoreUpdate = {};
                   if (isTelepathicMatch) {
                     scoreUpdate.score_sender = (match.score_sender || 0) + 1;
                   }
-                  await supabase.from('telepathy_matches').update({
-                    round_count: newRound,
-                    sender_symbol: null,
-                    receiver_guess: null,
-                    ...scoreUpdate
-                  }).eq('id', matchId);
+                  // Aggiorna score subito, ma round_count e clear simboli dopo 4s
+                  // così il receiver ha tempo di pollare e il guard round_count funziona
+                  if (Object.keys(scoreUpdate).length > 0) {
+                    await supabase.from('telepathy_matches').update(scoreUpdate).eq('id', matchId);
+                  }
+                  setTimeout(async () => {
+                    await supabase.from('telepathy_matches').update({
+                      round_count: newRound,
+                      sender_symbol: null,
+                      receiver_guess: null,
+                    }).eq('id', matchId);
+                  }, 4000);
                 } else if (role === 'receiver' && isTelepathicMatch) {
-                  // Il receiver aggiorna solo il proprio score nel DB
                   await supabase.from('telepathy_matches').update({
                     score_receiver: (match.score_receiver || 0) + 1
                   }).eq('id', matchId);
@@ -1262,6 +1277,18 @@
             const interval = setInterval(pollResult, 2000);
             return () => clearInterval(interval);
           }, [matchId, waitingForPartner, role, telepathyScore, bestScore, currentLevel, sessionMatches]);
+
+          // Rileva se il partner ha abbandonato la sessione (match eliminato)
+          // Gira quando abbiamo un matchId ma NON stiamo aspettando (pollResult non gira)
+          useEffect(() => {
+            if (!matchId || waitingForPartner) return;
+            const checkPartnerLeft = async () => {
+              const { data } = await supabase.from('telepathy_matches').select('id').eq('id', matchId);
+              if (!data || data.length === 0) resetTelepathy();
+            };
+            const interval = setInterval(checkPartnerLeft, 3000);
+            return () => clearInterval(interval);
+          }, [matchId, waitingForPartner]);
 
           // Poll per il cambio livello (gira tra i round quando showLevelBanner è true)
           useEffect(() => {
@@ -1351,6 +1378,7 @@
           }, [matchId, role, waitingForPartner, showResult]);
 
           const resetTelepathy = () => {
+            lastProcessedRoundRef.current = -1;
             setPartner(null);
             setRole(null);
             setSelectedSymbol(null);
@@ -1533,6 +1561,7 @@
             } catch (err) {
               console.warn('endSession error:', err);
             } finally {
+              setMatchId(null); // ferma checkPartnerLeft per non sovrascrivere la schermata
               setSessionEnded(true);
             }
           };
@@ -2210,9 +2239,10 @@
                         {/* SINISTRA: riepilogo sessione + status partner */}
                         <div style={{flex: '0 0 180px', minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
                           <div className="bg-glass-dark rounded-xl p-4">
-                            <p className="text-secondary text-xs mb-2">Con</p>
+                            <p className="text-secondary text-xs mb-1">Partner</p>
                             <p className="text-white font-bold">{partner?.nickname}</p>
-                            <p className="text-secondary text-xs mt-1">{role === 'sender' ? 'SENDER' : 'RECEIVER'}</p>
+                            <p className="text-secondary text-xs mt-2">Il tuo ruolo</p>
+                            <p className="text-white font-bold">{role === 'sender' ? 'Sender' : 'Receiver'}</p>
                           </div>
                           <div className="bg-glass-dark rounded-xl p-4" style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                             <div style={{display: 'flex', justifyContent: 'space-between'}}>
@@ -2326,9 +2356,8 @@
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                 <button onClick={() => { setShowResult(false); setSelectedSymbol(null); setGuessedSymbol(null); setPartnerSymbol(null); setWaitingForPartner(false); }} className="btn-secondary py-3 font-bold">Ancora</button>
-                                <button onClick={() => { resetTelepathy(); startSearching(); }} className="btn-primary">Nuovo Partner</button>
+                                <button onClick={endSession} className="btn-primary py-3 font-bold">Termina Sessione</button>
                               </div>
-                              <button onClick={endSession} className="btn-secondary w-full" style={{fontSize: '0.85rem'}}>Termina Sessione</button>
                             </div>
                           )}
 
