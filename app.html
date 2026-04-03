@@ -809,6 +809,7 @@
           const [showLevelBanner, setShowLevelBanner] = useState(false);
           const [myLevelChoice, setMyLevelChoice] = useState(null); // scelta fatta dall'utente locale
           const [sessionEnded, setSessionEnded] = useState(false); // mostra schermata fine sessione
+          const [partnerDisconnected, setPartnerDisconnected] = useState(false); // partner ha chiuso il tab
           const [onlineUsersForTelepathy, setOnlineUsersForTelepathy] = useState([]); // utenti con status
           const [senderHasSent, setSenderHasSent] = useState(false);
           const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
@@ -872,6 +873,24 @@
             const stored = localStorage.getItem('ga_show_telepathy');
             return stored !== null ? stored === 'true' : true;
           });
+
+          // Pulizia match alla chiusura del tab (sendBeacon garantisce la richiesta anche durante unload)
+          const matchIdRef = React.useRef(null);
+          React.useEffect(() => { matchIdRef.current = matchId; }, [matchId]);
+          React.useEffect(() => {
+            const handleUnload = () => {
+              const id = matchIdRef.current;
+              if (!id) return;
+              const url = `${SUPABASE_URL}/rest/v1/telepathy_matches?id=eq.${id}`;
+              const headers = JSON.stringify(SB_HEADERS);
+              // sendBeacon non supporta DELETE, usiamo fetch con keepalive
+              try {
+                fetch(url, { method: 'DELETE', headers: SB_HEADERS, keepalive: true });
+              } catch(e) {}
+            };
+            window.addEventListener('beforeunload', handleUnload);
+            return () => window.removeEventListener('beforeunload', handleUnload);
+          }, []);
 
           // Load scores
           useEffect(() => {
@@ -1364,17 +1383,29 @@
             return () => clearInterval(interval);
           }, [matchId, waitingForPartner, role, telepathyScore, bestScore, currentLevel, sessionMatches]);
 
-          // Rileva se il partner ha abbandonato la sessione (match eliminato)
-          // Gira quando abbiamo un matchId ma NON stiamo aspettando (pollResult non gira)
+          // Rileva se il partner ha abbandonato la sessione:
+          // 1. match eliminato (ha cliccato Termina o chiusura tab con sendBeacon)
+          // 2. partner non visto da >35s in online_users (tab chiusa senza cleanup)
           useEffect(() => {
             if (!matchId || waitingForPartner) return;
             const checkPartnerLeft = async () => {
               const { data } = await supabase.from('telepathy_matches').select('id').eq('id', matchId);
-              if (!data || data.length === 0) resetTelepathy();
+              if (!data || data.length === 0) {
+                setPartnerDisconnected(true);
+                return;
+              }
+              // Controlla last_seen del partner
+              if (partner?.id) {
+                const { data: pu } = await supabase.from('online_users').select('last_seen').eq('id', partner.id);
+                if (pu && pu.length > 0) {
+                  const stale = Date.now() - new Date(pu[0].last_seen).getTime() > 35000;
+                  if (stale) setPartnerDisconnected(true);
+                }
+              }
             };
             const interval = setInterval(checkPartnerLeft, 3000);
             return () => clearInterval(interval);
-          }, [matchId, waitingForPartner]);
+          }, [matchId, waitingForPartner, partner]);
 
           // Poll per il cambio livello (gira tra i round quando showLevelBanner è true)
           useEffect(() => {
@@ -1480,6 +1511,7 @@
             setShowLevelBanner(false);
             setMyLevelChoice(null);
             setSessionEnded(false);
+            setPartnerDisconnected(false);
             setDirectInviteTarget(null);
             setSenderHasSent(false);
             setTelepathyChatMessages([]);
@@ -2321,6 +2353,14 @@
 
                     {(partner || sessionEnded) && (
                       <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start'}}>
+                        {partnerDisconnected && (
+                          <div style={{width: '100%', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'center', marginBottom: '0.5rem'}}>
+                            <div style={{fontSize: '2rem', marginBottom: '0.4rem'}}>📡</div>
+                            <p className="text-white font-bold mb-2">Il tuo partner si è disconnesso</p>
+                            <p className="text-secondary text-sm mb-4">La connessione con {partner?.nickname || 'il partner'} è stata interrotta.</p>
+                            <button onClick={resetTelepathy} className="btn-primary">Torna alla lobby</button>
+                          </div>
+                        )}
 
                         {/* SINISTRA: riepilogo sessione + status partner */}
                         <div style={{flex: '0 0 180px', minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
