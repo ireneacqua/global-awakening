@@ -1282,8 +1282,8 @@
             const pollResult = async () => {
               const { data } = await supabase.from('telepathy_matches').select('*').eq('id', matchId);
               if (!data || data.length === 0) {
-                // Il partner ha abbandonato la sessione
-                resetTelepathy();
+                // Il partner ha abbandonato la sessione — mostra messaggio invece di resettare silenziosamente
+                setPartnerDisconnected(true);
                 return;
               }
               const match = data[0];
