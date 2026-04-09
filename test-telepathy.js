@@ -116,6 +116,15 @@ async function waitForLobby(page, nickname) {
   log(nickname, `Tornato in lobby`);
 }
 
+// Usata quando l'utente deve prima vedere il banner "partner ha terminato" e cliccare "Torna alla lobby"
+async function waitForLobbyAfterPartnerLeft(page, nickname) {
+  // Aspetta il banner di disconnessione e clicca "Torna alla lobby"
+  await page.waitForSelector(':text("ha terminato la sessione")', { timeout: TIMEOUT });
+  log(nickname, `Banner disconnessione ricevuto`);
+  await page.locator('button:has-text("Torna alla lobby")').click();
+  await waitForLobby(page, nickname);
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -130,6 +139,10 @@ async function waitForLobby(page, nickname) {
   const ctxB = await browser.newContext();
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
+
+  // Intercetta warning/error dai browser per debug
+  pageA.on('console', msg => { if (msg.type() === 'warning' || msg.type() === 'error') log('BROWSER-A', `${msg.type()}: ${msg.text()}`); });
+  pageB.on('console', msg => { if (msg.type() === 'warning' || msg.type() === 'error') log('BROWSER-B', `${msg.type()}: ${msg.text()}`); });
 
   try {
     // ── Test 1: Login ──────────────────────────────────────────────────────
@@ -221,9 +234,9 @@ async function waitForLobby(page, nickname) {
     await pageA.waitForSelector('text=Sessione Completata!', { timeout: TIMEOUT });
     pass('TestUserA vede la schermata "Sessione Completata"');
 
-    // L'altro browser deve tornare in lobby entro 4 secondi (match eliminato)
-    await waitForLobby(pageB, 'TestUserB');
-    pass('TestUserB tornato in lobby automaticamente dopo che il partner ha terminato');
+    // TestUserB vede il banner "partner ha terminato" e clicca "Torna alla lobby"
+    await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
+    pass('TestUserB tornato in lobby dopo aver cliccato "Torna alla lobby"');
 
     // ── Test 8: Invito diretto ────────────────────────────────────────────
     console.log('\n📋 Test 8: Invito diretto (Proponi → Accetta)');
@@ -236,37 +249,56 @@ async function waitForLobby(page, nickname) {
 
     // Aspetta che la lista utenti si aggiorni (fino a 12s)
     await pageA.waitForTimeout(12000);
-    // Trova il bottone "Proponi" per TestUserB tramite valutazione DOM diretta
-    const proponiCount = await pageA.evaluate(() => {
+    // Trova e clicca il bottone Proponi per TestUserB
+    // Usiamo dispatchEvent con MouseEvent (bubbles:true) per triggerare React event delegation
+    const clickResult = await pageA.evaluate((targetNick) => {
       const spans = [...document.querySelectorAll('span.text-white.text-sm.font-medium')];
-      return spans.filter(s => s.textContent.trim() === 'TestUserB').length;
-    });
+      const nickSpan = spans.find(s => s.textContent.trim() === targetNick);
+      if (!nickSpan) return `span "${targetNick}" not found`;
+      const infoDiv = nickSpan.parentElement;
+      const rowDiv = infoDiv?.parentElement;
+      if (!rowDiv) return 'no rowDiv';
+      const btn = rowDiv.querySelector('button');
+      if (!btn) return `no button in row for ${targetNick}`;
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return `clicked Proponi for ${targetNick}`;
+    }, 'TestUserB');
+    log('DEBUG', `clickResult: ${clickResult}`);
+    const proponiCount = clickResult.startsWith('clicked') ? 1 : 0;
     if (proponiCount === 0) {
-      fail('TestUserA non vede il bottone "Proponi" per TestUserB');
+      fail(`TestUserA non vede il bottone "Proponi" per TestUserB: ${clickResult}`);
     } else {
-      // Clicca il Proponi della riga TestUserB tramite DOM
-      await pageA.evaluate(() => {
-        const spans = [...document.querySelectorAll('span.text-white.text-sm.font-medium')];
-        for (const span of spans) {
-          if (span.textContent.trim() === 'TestUserB') {
-            const row = span.closest('div[style*="space-between"]') || span.parentElement?.parentElement;
-            const btn = row?.querySelector('button');
-            if (btn) btn.click();
-            return;
-          }
-        }
-      });
-      log('TestUserA', 'Invito diretto inviato a TestUserB');
-      await pageA.waitForTimeout(1000);
+      log('TestUserA', 'Click su Proponi eseguito');
 
-      // Debug: verifica che l'invito sia nel DB
+      // Verifica che React abbia ricevuto il click (appare "Invito inviato..." nella riga)
+      try {
+        await pageA.waitForSelector(':text("Invito inviato...")', { timeout: 5000 });
+        log('TestUserA', 'React ha ricevuto il click — stato UI aggiornato');
+      } catch {
+        // Logga il contenuto attuale della lista utenti per debug
+        const debugText = await pageA.evaluate(() => {
+          const container = document.querySelector('[class*="telepathy"]') || document.body;
+          return container.innerText.substring(0, 500);
+        });
+        log('DEBUG', `Pagina A dopo click: ${debugText.replace(/\n/g, ' | ')}`);
+        fail('TestUserA: "Invito inviato..." non apparso dopo il click su Proponi');
+      }
+
+      log('TestUserA', 'Invito diretto inviato a TestUserB');
+      await pageA.waitForTimeout(2000);
+
+      // Debug: verifica invito nel DB
       const invResp = await fetch(`${SUPABASE_URL}/rest/v1/telepathy_invites?select=*&status=eq.pending&order=created_at.desc&limit=5`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       const invites = await invResp.json();
       log('DEBUG', `Inviti pending nel DB: ${JSON.stringify(invites.map(i => ({ from: i.from_name, to: i.to_name, to_id: i.to_id })))}`);
 
-      // Debug: verifica sessionId di TestUserB nel DB
+      // Debug: sessionId di TestUserB dal browser B
+      const sessionIdB = await pageB.evaluate(() => localStorage.getItem('ga_session_id') || 'no_ga_session_id');
+      log('DEBUG', `sessionId di TestUserB (browser B): ${sessionIdB}`);
+
+      // Debug: stato di TestUserB nel DB
       const ouResp = await fetch(`${SUPABASE_URL}/rest/v1/online_users?select=id,nickname&nickname=eq.TestUserB`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
@@ -295,7 +327,7 @@ async function waitForLobby(page, nickname) {
       await pageA.locator('button:has-text("Termina Sessione")').click();
       await Promise.all([
         pageA.waitForSelector(':text("Sessione Completata!")', { timeout: TIMEOUT }),
-        waitForLobby(pageB, 'TestUserB'),
+        waitForLobbyAfterPartnerLeft(pageB, 'TestUserB'),
       ]);
     }
 
@@ -354,8 +386,8 @@ async function waitForLobby(page, nickname) {
     // ── Test 11: Cambio livello dopo 7 round ────────────────────────────
     console.log('\n📋 Test 11: Cambio livello dopo 7 round');
 
-    // Nuova sessione per TestUserB (che è tornato in lobby)
-    await waitForLobby(pageB, 'TestUserB');
+    // Nuova sessione per TestUserB (che deve cliccare Torna alla lobby)
+    await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
     await pageA.locator('button:has-text("Torna alla Lobby")').click();
     await waitForLobby(pageA, 'TestUserA');
 

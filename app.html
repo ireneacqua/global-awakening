@@ -1455,7 +1455,7 @@
           // 1. match eliminato (ha cliccato Termina o chiusura tab con sendBeacon)
           // 2. partner non visto da >35s in online_users (tab chiusa senza cleanup)
           useEffect(() => {
-            if (!matchId || waitingForPartner) return;
+            if (!matchId) return;
             const checkPartnerLeft = async () => {
               const { data } = await supabase.from('telepathy_matches').select('id').eq('id', matchId);
               if (!data || data.length === 0) {
@@ -1473,7 +1473,7 @@
             };
             const interval = setInterval(checkPartnerLeft, 3000);
             return () => clearInterval(interval);
-          }, [matchId, waitingForPartner, partner]);
+          }, [matchId, partner]);
 
           // Poll per il cambio livello (gira tra i round quando showLevelBanner è true)
           useEffect(() => {
