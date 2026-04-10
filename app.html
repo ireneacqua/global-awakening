@@ -1675,6 +1675,11 @@
           const declineInvite = async () => {
             if (!incomingInvite) return;
             await supabase.from('telepathy_invites').update({ status: 'declined' }).eq('id', incomingInvite.invite_id);
+            await supabase.from('notifications').insert({
+              user_nickname: incomingInvite.from_name,
+              type: 'telepathy_declined',
+              message: `${nickname} ha rifiutato il tuo invito al training telepatico`
+            });
             setIncomingInvite(null);
           };
 
@@ -2343,7 +2348,7 @@
                               <>
                                 {notifItems.map(n => {
                                   const tabTarget = n.type === 'telepathy_invite' ? 'telepathy' : n.type === 'comment' ? 'consciousness' : n.type === 'private_message' ? null : 'rituals';
-                                  const icon = n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : n.type === 'private_message' ? '✉️' : '🧠';
+                                  const icon = n.type === 'comment' || n.type === 'ritual_comment' ? '💬' : n.type === 'ritual_join' ? '🌟' : n.type === 'private_message' ? '✉️' : n.type === 'telepathy_declined' ? '❌' : '🧠';
                                   return (
                                   <div key={n.id} style={{
                                     padding: '0.5rem 0.25rem',
