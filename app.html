@@ -3069,34 +3069,6 @@
                         />
                       </div>
 
-                      {/* Starseed Type & Experience Level */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.starseedType}</label>
-                          <select
-                            value={profile.starseedType}
-                            onChange={(e) => setProfile({...profile, starseedType: e.target.value})}
-                          >
-                            <option value="">--</option>
-                            {starseedTypes.map(st => (
-                              <option key={st} value={st}>{t.profile.starseedTypes[st]}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.experienceLevel}</label>
-                          <select
-                            value={profile.experienceLevel}
-                            onChange={(e) => setProfile({...profile, experienceLevel: e.target.value})}
-                          >
-                            <option value="">--</option>
-                            {experienceLevels.map(lvl => (
-                              <option key={lvl} value={lvl}>{t.profile.experienceLevels[lvl]}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
                       {/* Country */}
                       <div>
                         <label className="text-white text-sm mb-2" style={{display: 'block'}}>{t.profile.country}</label>
@@ -3213,24 +3185,6 @@
                         {viewingProfile.bio && (
                           <div className="bg-glass-dark rounded-xl p-4">
                             <p className="text-white" style={{whiteSpace: 'pre-wrap'}}>{viewingProfile.bio}</p>
-                          </div>
-                        )}
-
-                        {/* Starseed Type + Experience */}
-                        {(viewingProfile.starseedType || viewingProfile.experienceLevel) && (
-                          <div className="grid grid-cols-2 gap-3">
-                            {viewingProfile.starseedType && (
-                              <div className="bg-glass-dark rounded-xl p-3 text-center">
-                                <p className="text-secondary text-xs mb-1">{t.profile.starseedType}</p>
-                                <p className="text-white font-bold">{t.profile.starseedTypes[viewingProfile.starseedType] || viewingProfile.starseedType}</p>
-                              </div>
-                            )}
-                            {viewingProfile.experienceLevel && (
-                              <div className="bg-glass-dark rounded-xl p-3 text-center">
-                                <p className="text-secondary text-xs mb-1">{t.profile.experienceLevel}</p>
-                                <p className="text-white font-bold">{t.profile.experienceLevels[viewingProfile.experienceLevel] || viewingProfile.experienceLevel}</p>
-                              </div>
-                            )}
                           </div>
                         )}
 
