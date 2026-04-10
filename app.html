@@ -566,12 +566,13 @@
             forgotPassword: "Forgot password?",
             resetPassword: "Reset Password",
             backToLogin: "Back to login",
-            resetNicknamePlaceholder: "Your username",
             newPasswordPlaceholder: "New password",
             confirmPasswordPlaceholder: "Confirm new password",
             passwordsNoMatch: "Passwords do not match",
-            resetNotFound: "No account found with this email and username",
+            resetEmailSent: "Email sent! Check your inbox and click the link.",
+            resetTokenInvalid: "Link invalid or expired. Please request a new one.",
             resetSuccess: "Password updated! You can now log in.",
+            setNewPassword: "Set new password",
             guestBadge: "Guest",
             registeredBadge: "Registered",
             registerInvite: "Register to save your profile permanently",
@@ -705,12 +706,13 @@
             forgotPassword: "Password dimenticata?",
             resetPassword: "Reimposta Password",
             backToLogin: "Torna al login",
-            resetNicknamePlaceholder: "Il tuo username",
             newPasswordPlaceholder: "Nuova password",
             confirmPasswordPlaceholder: "Conferma nuova password",
             passwordsNoMatch: "Le password non coincidono",
-            resetNotFound: "Nessun account trovato con questa email e username",
+            resetEmailSent: "Email inviata! Controlla la tua casella e clicca il link.",
+            resetTokenInvalid: "Link non valido o scaduto. Richiedine uno nuovo.",
             resetSuccess: "Password aggiornata! Puoi ora accedere.",
+            setNewPassword: "Imposta nuova password",
             guestBadge: "Ospite",
             registeredBadge: "Registrato",
             registerInvite: "Registrati per salvare il profilo in modo permanente",
@@ -913,9 +915,14 @@
           const [authTab, setAuthTab] = useState('guest');
           const [showResetForm, setShowResetForm] = useState(false);
           const [resetEmail, setResetEmail] = useState('');
-          const [resetNickname, setResetNickname] = useState('');
           const [resetNewPassword, setResetNewPassword] = useState('');
           const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+          const [resetToken, setResetToken] = useState(() => {
+            const p = new URLSearchParams(window.location.search);
+            const tok = p.get('reset');
+            if (tok) window.history.replaceState({}, '', window.location.pathname);
+            return tok || '';
+          });
           const t = translations[lang];
 
           const avatarEmojis = ['🌟', '✨', '🔮', '🧿', '💫', '⭐', '🌙', '☀️', '🌈', '🦋', '🕊️', '🐉', '🧬', '👁️', '💜', '🔥', '🌸', '🍃', '💎', '🪷'];
@@ -1309,34 +1316,55 @@
             setShowNicknamePrompt(false);
           };
 
-          const handleResetPassword = async () => {
+          const handleSendResetEmail = async () => {
             const email = resetEmail.trim().toLowerCase();
-            const nick = resetNickname.trim();
-            const pw = resetNewPassword.trim();
-            const pw2 = resetConfirmPassword.trim();
-            if (!email || !nick || !pw || !pw2) {
-              setLoginError(t.fillAllFields);
-              return;
-            }
-            if (pw !== pw2) {
-              setLoginError(t.passwordsNoMatch);
-              return;
-            }
+            if (!email) { setLoginError(t.fillAllFields); return; }
             setLoginError('');
             setLoginSuccess('');
-            const { data } = await supabase.from('profiles').select('session_id,nickname').eq('email', email).eq('nickname', nick);
-            if (!data || data.length === 0) {
-              setLoginError(t.resetNotFound);
+            try {
+              const appUrl = window.location.origin + window.location.pathname;
+              await fetch(
+                'https://vxzxdkcluyrcftsnxxza.supabase.co/functions/v1/send-reset-email',
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email, appUrl }),
+                }
+              );
+              // Risposta sempre positiva per non rivelare se l'email esiste
+              setLoginSuccess(t.resetEmailSent);
+              setResetEmail('');
+            } catch (err) {
+              setLoginError('Errore invio email. Riprova.');
+            }
+          };
+
+          const handleSetNewPassword = async () => {
+            const pw = resetNewPassword.trim();
+            const pw2 = resetConfirmPassword.trim();
+            if (!pw || !pw2) { setLoginError(t.fillAllFields); return; }
+            if (pw !== pw2) { setLoginError(t.passwordsNoMatch); return; }
+            setLoginError('');
+            setLoginSuccess('');
+            // Verifica token nel DB
+            const { data: row } = await supabase
+              .from('password_resets')
+              .select('email, expires_at')
+              .eq('token', resetToken)
+              .single();
+            if (!row || new Date(row.expires_at) < new Date()) {
+              setLoginError(t.resetTokenInvalid);
+              setResetToken('');
               return;
             }
             const hash = await hashPassword(pw);
-            await supabase.from('profiles').update({ password_hash: hash }).eq('email', email).eq('nickname', nick);
+            await supabase.from('profiles').update({ password_hash: hash }).eq('email', row.email);
+            await supabase.from('password_resets').delete().eq('token', resetToken);
             setLoginSuccess(t.resetSuccess);
-            setResetEmail('');
-            setResetNickname('');
             setResetNewPassword('');
             setResetConfirmPassword('');
-            setTimeout(() => { setShowResetForm(false); setAuthTab('login'); setLoginSuccess(''); }, 2500);
+            setResetToken('');
+            setTimeout(() => { setAuthTab('login'); setLoginSuccess(''); }, 2500);
           };
 
           const handleLogout = () => {
@@ -2288,6 +2316,7 @@
                     )}
 
                     {/* Reset Password Form */}
+                    {/* Reset Step 1: inserisci email */}
                     {authTab === 'login' && showResetForm && (
                       <>
                         <p className="text-white font-bold text-center" style={{fontSize: '1.05rem'}}>{t.resetPassword}</p>
@@ -2297,12 +2326,22 @@
                           onChange={(e) => { setResetEmail(e.target.value); setLoginError(''); }}
                           placeholder={t.emailPlaceholder}
                         />
-                        <input
-                          type="text"
-                          value={resetNickname}
-                          onChange={(e) => { setResetNickname(e.target.value); setLoginError(''); }}
-                          placeholder={t.resetNicknamePlaceholder}
-                        />
+                        <button onClick={handleSendResetEmail} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim()}>
+                          {t.resetPassword}
+                        </button>
+                        <p
+                          onClick={() => { setShowResetForm(false); setLoginError(''); setLoginSuccess(''); }}
+                          style={{color: '#a78bfa', textAlign: 'center', cursor: 'pointer', fontSize: '0.875rem'}}
+                        >
+                          {t.backToLogin}
+                        </p>
+                      </>
+                    )}
+
+                    {/* Reset Step 2: nuova password (quando arriva dal link email) */}
+                    {resetToken && (
+                      <>
+                        <p className="text-white font-bold text-center" style={{fontSize: '1.05rem'}}>{t.setNewPassword}</p>
                         <input
                           type="password"
                           value={resetNewPassword}
@@ -2315,15 +2354,9 @@
                           onChange={(e) => { setResetConfirmPassword(e.target.value); setLoginError(''); }}
                           placeholder={t.confirmPasswordPlaceholder}
                         />
-                        <button onClick={handleResetPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim() || !resetNickname.trim() || !resetNewPassword.trim() || !resetConfirmPassword.trim()}>
-                          {t.resetPassword}
+                        <button onClick={handleSetNewPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetNewPassword.trim() || !resetConfirmPassword.trim()}>
+                          {t.setNewPassword}
                         </button>
-                        <p
-                          onClick={() => { setShowResetForm(false); setLoginError(''); setLoginSuccess(''); }}
-                          style={{color: '#a78bfa', textAlign: 'center', cursor: 'pointer', fontSize: '0.875rem'}}
-                        >
-                          {t.backToLogin}
-                        </p>
                       </>
                     )}
 
