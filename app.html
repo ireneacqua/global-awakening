@@ -820,6 +820,8 @@
           const [showResult, setShowResult] = useState(false);
           // Tiene traccia dell'ultimo round_count processato per evitare doppio processing
           const lastProcessedRoundRef = React.useRef(-1);
+          // Tiene traccia della scelta livello fatta (senza stale-closure nei poll)
+          const myLevelChoiceRef = React.useRef(null);
           const [isMatch, setIsMatch] = useState(false);
           const [matchId, setMatchId] = useState(null);
           const [partnerSymbol, setPartnerSymbol] = useState(null);
@@ -1058,7 +1060,7 @@
             };
             
             loadData();
-            const interval = setInterval(loadData, 3000);
+            const interval = setInterval(loadData, 10000);
             
             // Subscribe to real-time updates
             const ritualsChannel = supabase.channel('rituals-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'rituals' }, () => loadData()).subscribe();
@@ -1333,6 +1335,7 @@
 
           const proposeLevelChange = async (choice) => {
             setMyLevelChoice(choice);
+            myLevelChoiceRef.current = choice;
             const field = role === 'sender' ? 'level_change_choice_sender' : 'level_change_choice_receiver';
             await supabase.from('telepathy_matches').update({ [field]: choice }).eq('id', matchId);
           };
@@ -1471,7 +1474,7 @@
                 }
               }
             };
-            const interval = setInterval(checkPartnerLeft, 3000);
+            const interval = setInterval(checkPartnerLeft, 5000);
             return () => clearInterval(interval);
           }, [matchId, partner]);
 
@@ -1485,7 +1488,27 @@
               const match = data[0];
               const senderChoice = match.level_change_choice_sender;
               const receiverChoice = match.level_change_choice_receiver;
-              if (!senderChoice || !receiverChoice) return;
+
+              if (!senderChoice || !receiverChoice) {
+                // Bug-fix B: race condition — se io avevo già scelto ma le choices sono
+                // state cancellate dall'altro utente (che ha processato per primo):
+                // 1) livello cambiato → sync + dismiss
+                if (match.level && match.level !== currentLevel) {
+                  setCurrentLevel(match.level);
+                  setRoundCount(0);
+                  lastProcessedRoundRef.current = -1;
+                  setShowLevelBanner(false);
+                  setMyLevelChoice(null);
+                  myLevelChoiceRef.current = null;
+                }
+                // 2) livello invariato (disaccordo/continua) → se avevo già scelto, dismiss
+                else if (myLevelChoiceRef.current !== null) {
+                  setShowLevelBanner(false);
+                  setMyLevelChoice(null);
+                  myLevelChoiceRef.current = null;
+                }
+                return;
+              }
 
               const agreed = senderChoice === receiverChoice && senderChoice !== 'continue';
               const newLevel = agreed ? senderChoice : currentLevel;
@@ -1493,9 +1516,12 @@
               if (agreed) {
                 setCurrentLevel(newLevel);
                 setRoundCount(0);
+                // Bug-fix A: resetta il ref così i round successivi vengono processati
+                lastProcessedRoundRef.current = -1;
               }
               setShowLevelBanner(false);
               setMyLevelChoice(null);
+              myLevelChoiceRef.current = null;
 
               const updatePayload = {
                 level: newLevel,
@@ -1542,7 +1568,7 @@
               if (data) setTelepathyChatMessages(data);
             };
             loadChat();
-            const interval = setInterval(loadChat, 2000);
+            const interval = setInterval(loadChat, 3000);
             return () => clearInterval(interval);
           }, [matchId]);
 
@@ -1564,6 +1590,7 @@
 
           const resetTelepathy = () => {
             lastProcessedRoundRef.current = -1;
+            myLevelChoiceRef.current = null;
             setPartner(null);
             setRole(null);
             setSelectedSymbol(null);
@@ -1832,7 +1859,7 @@
               }
             };
             loadMessages();
-            const interval = setInterval(loadMessages, 4000);
+            const interval = setInterval(loadMessages, 8000);
             return () => clearInterval(interval);
           }, [nickname]);
 
@@ -1844,7 +1871,7 @@
               if (data) setNotifItems(data);
             };
             loadNotifications();
-            const interval = setInterval(loadNotifications, 5000);
+            const interval = setInterval(loadNotifications, 10000);
             return () => clearInterval(interval);
           }, [nickname]);
 
