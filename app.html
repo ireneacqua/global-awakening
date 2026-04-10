@@ -2045,7 +2045,7 @@
               ritual_id: ritualId,
               author_nickname: nickname,
               content
-            });
+            }).select();
             if (data && data.length > 0) {
               setRitualCommentsMap(prev => ({ ...prev, [ritualId]: [...(prev[ritualId] || []), ...data] }));
               setNewRitualCommentContents(prev => ({ ...prev, [ritualId]: '' }));
