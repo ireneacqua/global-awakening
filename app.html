@@ -1889,6 +1889,15 @@
               const senderMatch = notif.message.match(/^(.+) ti ha inviato/);
               if (senderMatch) openProfile(senderMatch[1]);
             } else {
+              if (notif.type === 'telepathy_invite') {
+                // Fetch immediato dell'invito senza aspettare il prossimo ciclo di updatePresence
+                const { data: invites } = await supabase.from('telepathy_invites')
+                  .select('*').eq('to_id', sessionId).eq('status', 'pending');
+                if (invites && invites.length > 0) {
+                  const inv = invites[0];
+                  setIncomingInvite({ from_id: inv.from_id, from_name: inv.from_name, invite_id: inv.id });
+                }
+              }
               setActiveTab(tabTarget);
             }
           };
