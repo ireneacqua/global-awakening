@@ -2062,11 +2062,18 @@
 
           const createPost = async () => {
             if (!newPostContent.trim()) return;
-            await supabase.from('consciousness_posts').insert({
+            const content = newPostContent.trim();
+            // Optimistic update: mostra subito il post e svuota la textarea
+            const optimistic = {
+              id: `local-${Date.now()}`,
               author_nickname: nickname,
-              content: newPostContent.trim()
-            });
+              content,
+              created_at: new Date().toISOString()
+            };
+            setPosts(prev => [optimistic, ...prev]);
             setNewPostContent('');
+            // Salva in background (sostituisce l'entry ottimistica al prossimo poll)
+            await supabase.from('consciousness_posts').insert({ author_nickname: nickname, content });
           };
 
           const togglePostComments = async (postId) => {
@@ -2082,22 +2089,25 @@
           const createComment = async (postId) => {
             const content = (newCommentContents[postId] || '').trim();
             if (!content) return;
-            const { data } = await supabase.from('consciousness_comments').insert({
+            // Optimistic update: mostra subito il commento e svuota l'input
+            const optimistic = {
+              id: `local-${Date.now()}`,
               post_id: postId,
               author_nickname: nickname,
-              content
-            });
-            if (data && data.length > 0) {
-              setCommentsMap(prev => ({ ...prev, [postId]: [...(prev[postId] || []), ...data] }));
-              setNewCommentContents(prev => ({ ...prev, [postId]: '' }));
-              const post = posts.find(p => p.id === postId);
-              if (post && post.author_nickname !== nickname) {
-                await supabase.from('notifications').insert({
-                  user_nickname: post.author_nickname,
-                  type: 'comment',
-                  message: `${nickname} ha commentato il tuo post`
-                });
-              }
+              content,
+              created_at: new Date().toISOString()
+            };
+            setCommentsMap(prev => ({ ...prev, [postId]: [...(prev[postId] || []), optimistic] }));
+            setNewCommentContents(prev => ({ ...prev, [postId]: '' }));
+            // Salva in background
+            await supabase.from('consciousness_comments').insert({ post_id: postId, author_nickname: nickname, content });
+            const post = posts.find(p => p.id === postId);
+            if (post && post.author_nickname !== nickname) {
+              await supabase.from('notifications').insert({
+                user_nickname: post.author_nickname,
+                type: 'comment',
+                message: `${nickname} ha commentato il tuo post`
+              });
             }
           };
 
