@@ -650,8 +650,8 @@
             },
             social: {
               viewProfile: "View Profile",
-              telepathyScore: "Telepathy Score",
-              bestScore: "Best Score",
+              telepathyScore: "Rounds Played",
+              bestScore: "Match %",
               community: "Community",
               noProfile: "No profile yet",
               close: "Close"
@@ -780,8 +780,8 @@
             },
             social: {
               viewProfile: "Vedi Profilo",
-              telepathyScore: "Punteggio Telepatia",
-              bestScore: "Miglior Punteggio",
+              telepathyScore: "Round Giocati",
+              bestScore: "% Match",
               community: "Comunita'",
               noProfile: "Nessun profilo ancora",
               close: "Chiudi"
@@ -809,8 +809,8 @@
           const [showNicknamePrompt, setShowNicknamePrompt] = useState(() => !localStorage.getItem('ga_nickname'));
           const [onlineUsers, setOnlineUsers] = useState([]);
           
-          const [telepathyScore, setTelepathyScore] = useState(0);
-          const [bestScore, setBestScore] = useState(0);
+          const [totalRounds, setTotalRounds] = useState(0);
+          const [totalMatches, setTotalMatches] = useState(0);
           const [searchingPartner, setSearchingPartner] = useState(false);
           const [partner, setPartner] = useState(null);
           const [role, setRole] = useState(null);
@@ -938,8 +938,8 @@
           useEffect(() => {
             const score = localStorage.getItem('telepathy_score');
             const best = localStorage.getItem('telepathy_best');
-            if (score) setTelepathyScore(parseInt(score));
-            if (best) setBestScore(parseInt(best));
+            if (score) setTotalRounds(parseInt(score));
+            if (best) setTotalMatches(parseInt(best));
           }, []);
 
           // Update presence in Supabase
@@ -1217,8 +1217,8 @@
             localStorage.setItem('ga_nickname', existing.nickname || 'Anonymous');
             localStorage.setItem('ga_email', email);
             localStorage.setItem('ga_is_guest', 'false');
-            if (existing.telepathy_score) setTelepathyScore(existing.telepathy_score);
-            if (existing.telepathy_best) setBestScore(existing.telepathy_best);
+            if (existing.telepathy_score) setTotalRounds(existing.telepathy_score);
+            if (existing.telepathy_best) setTotalMatches(existing.telepathy_best);
             setNickname(existing.nickname || 'Anonymous');
             setShowNicknamePrompt(false);
           };
@@ -1431,17 +1431,6 @@
                   }).eq('id', matchId);
                 }
 
-                // Score locale (entrambi aggiornano il proprio)
-                if (isTelepathicMatch) {
-                  const newScore = telepathyScore + 10;
-                  setTelepathyScore(newScore);
-                  localStorage.setItem('telepathy_score', newScore);
-                  if (newScore > bestScore) {
-                    setBestScore(newScore);
-                    localStorage.setItem('telepathy_best', newScore);
-                  }
-                }
-
                 // Suggerisci cambio livello ogni 7 round
                 if (newRound >= 7 && newRound % 7 === 0) {
                   setShowLevelBanner(true);
@@ -1452,7 +1441,7 @@
             pollResult();
             const interval = setInterval(pollResult, 2000);
             return () => clearInterval(interval);
-          }, [matchId, waitingForPartner, role, telepathyScore, bestScore, currentLevel, sessionMatches]);
+          }, [matchId, waitingForPartner, role, currentLevel, sessionMatches]);
 
           // Rileva se il partner ha abbandonato la sessione:
           // 1. match eliminato (ha cliccato Termina o chiusura tab con sendBeacon)
@@ -1720,8 +1709,8 @@
               country: profile.country,
               interests: profile.interests,
               experience_level: profile.experienceLevel,
-              telepathy_score: telepathyScore,
-              telepathy_best: bestScore,
+              telepathy_score: totalRounds,
+              telepathy_best: totalMatches,
               show_telepathy_score: showTelepathyScore
             };
             if (passwordHash) row.password_hash = passwordHash;
@@ -1766,14 +1755,27 @@
             try {
               const userId = userEmail || sessionId;
               const { data: existing } = await supabase.from('telepathy_scores').select('*').eq('user_id', userId);
-              const prev = (existing && existing.length > 0) ? existing[0] : { sessions_count: 0, matches_count: 0 };
+              const prev = (existing && existing.length > 0) ? existing[0] : { sessions_count: 0, matches_count: 0, rounds_count: 0 };
+              const newRounds = (prev.rounds_count || 0) + roundCount;
+              const newMatches = (prev.matches_count || 0) + sessionMatches;
               await supabase.from('telepathy_scores').upsert({
                 user_id: userId,
                 nickname: nickname || 'Anonymous',
                 sessions_count: (prev.sessions_count || 0) + 1,
-                matches_count: (prev.matches_count || 0) + sessionMatches,
+                matches_count: newMatches,
+                rounds_count: newRounds,
                 updated_at: new Date().toISOString()
               });
+              setTotalRounds(newRounds);
+              setTotalMatches(newMatches);
+              localStorage.setItem('telepathy_score', String(newRounds));
+              localStorage.setItem('telepathy_best', String(newMatches));
+              if (sessionId) {
+                await supabase.from('profiles').update({
+                  telepathy_score: newRounds,
+                  telepathy_best: newMatches
+                }).eq('session_id', sessionId);
+              }
               if (matchId) {
                 await supabase.from('telepathy_matches').delete().eq('id', matchId);
               }
@@ -2351,8 +2353,8 @@
                       <div className="text-secondary text-xs">Active Rituals</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold" style={{color: '#fbbf24'}}>{telepathyScore}</div>
-                      <div className="text-secondary text-xs">Telepathy Score</div>
+                      <div className="text-2xl font-bold" style={{color: '#fbbf24'}}>{totalRounds}</div>
+                      <div className="text-secondary text-xs">Rounds Played</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold" style={{color: '#4ade80'}}>{onlineUsers.length}</div>
@@ -2992,11 +2994,11 @@
                       <div className="grid grid-cols-2 gap-3 mb-3">
                         <div className="text-center">
                           <p className="text-secondary text-xs mb-1">{t.social.telepathyScore}</p>
-                          <p className="text-2xl font-bold" style={{color: '#fbbf24'}}>{telepathyScore}</p>
+                          <p className="text-2xl font-bold" style={{color: '#fbbf24'}}>{totalRounds}</p>
                         </div>
                         <div className="text-center">
                           <p className="text-secondary text-xs mb-1">{t.social.bestScore}</p>
-                          <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{bestScore}</p>
+                          <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{totalRounds > 0 ? Math.round((totalMatches / totalRounds) * 100) : 0}%</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between" style={{padding: '0.5rem 0'}}>
@@ -3229,7 +3231,7 @@
                             </div>
                             <div className="bg-glass-dark rounded-xl p-3 text-center">
                               <p className="text-secondary text-xs mb-1">{t.social.bestScore}</p>
-                              <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{viewingProfile.telepathyBest}</p>
+                              <p className="text-2xl font-bold" style={{color: '#4ade80'}}>{viewingProfile.telepathyScore > 0 ? Math.round((viewingProfile.telepathyBest / viewingProfile.telepathyScore) * 100) : 0}%</p>
                             </div>
                           </div>
                         )}
