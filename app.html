@@ -1628,7 +1628,7 @@
             if (!incomingInvite) return;
             const myRole = Math.random() > 0.5 ? 'sender' : 'receiver';
             const theirRole = myRole === 'sender' ? 'receiver' : 'sender';
-            const { data: matchData, error: matchError } = await supabase.from('telepathy_matches').insert({
+            const { error: matchError } = await supabase.from('telepathy_matches').insert({
               user1_id: incomingInvite.from_id,
               user1_nickname: incomingInvite.from_name,
               user1_role: theirRole,
@@ -1645,13 +1645,20 @@
               return;
             }
             await supabase.from('telepathy_invites').update({ status: 'accepted' }).eq('id', incomingInvite.invite_id);
-            if (matchData && matchData.length > 0) {
-              setMatchId(matchData[0].id);
+            // Recupera il match appena creato con un SELECT separato (insert senza .select() ritorna null)
+            const { data: newMatch } = await supabase.from('telepathy_matches')
+              .select('id,user1_role,user2_role')
+              .eq('user2_id', sessionId)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            if (newMatch && newMatch.length > 0) {
+              setMatchId(newMatch[0].id);
             }
             setPartner({ id: incomingInvite.from_id, nickname: incomingInvite.from_name });
             setRole(myRole);
             setIncomingInvite(null);
             setSearchingPartner(false);
+            setActiveTab('telepathy');
           };
 
           const declineInvite = async () => {
