@@ -1660,6 +1660,15 @@
             setRole(myRole);
             setIncomingInvite(null);
             setSearchingPartner(false);
+            setSessionEnded(false);
+            setPartnerDisconnected(false);
+            setShowResult(false);
+            setSelectedSymbol(null);
+            setGuessedSymbol(null);
+            setPartnerSymbol(null);
+            setWaitingForPartner(false);
+            setRoundCount(0);
+            setSessionMatches(0);
             setActiveTab('telepathy');
           };
 
@@ -3332,7 +3341,7 @@
                 </div>
               )}
 
-              {incomingInvite && !partner && (
+              {incomingInvite && (!partner || sessionEnded) && (
                 <div className="modal-overlay">
                   <div className="modal-content" style={{maxWidth: '360px', textAlign: 'center'}}>
                     <div style={{fontSize: '3rem', marginBottom: '0.75rem'}}>🧠</div>
