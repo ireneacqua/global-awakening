@@ -563,6 +563,15 @@
             tabRegister: "Register",
             noAccountYet: "No account yet? Register",
             alreadyHaveAccount: "Already have an account? Login",
+            forgotPassword: "Forgot password?",
+            resetPassword: "Reset Password",
+            backToLogin: "Back to login",
+            resetNicknamePlaceholder: "Your username",
+            newPasswordPlaceholder: "New password",
+            confirmPasswordPlaceholder: "Confirm new password",
+            passwordsNoMatch: "Passwords do not match",
+            resetNotFound: "No account found with this email and username",
+            resetSuccess: "Password updated! You can now log in.",
             guestBadge: "Guest",
             registeredBadge: "Registered",
             registerInvite: "Register to save your profile permanently",
@@ -693,6 +702,15 @@
             tabRegister: "Registrati",
             noAccountYet: "Non hai un account? Registrati",
             alreadyHaveAccount: "Hai gia' un account? Accedi",
+            forgotPassword: "Password dimenticata?",
+            resetPassword: "Reimposta Password",
+            backToLogin: "Torna al login",
+            resetNicknamePlaceholder: "Il tuo username",
+            newPasswordPlaceholder: "Nuova password",
+            confirmPasswordPlaceholder: "Conferma nuova password",
+            passwordsNoMatch: "Le password non coincidono",
+            resetNotFound: "Nessun account trovato con questa email e username",
+            resetSuccess: "Password aggiornata! Puoi ora accedere.",
             guestBadge: "Ospite",
             registeredBadge: "Registrato",
             registerInvite: "Registrati per salvare il profilo in modo permanente",
@@ -893,6 +911,11 @@
           const [isGuest, setIsGuest] = useState(() => localStorage.getItem('ga_is_guest') === 'true');
           const [userEmail, setUserEmail] = useState(() => localStorage.getItem('ga_email') || '');
           const [authTab, setAuthTab] = useState('guest');
+          const [showResetForm, setShowResetForm] = useState(false);
+          const [resetEmail, setResetEmail] = useState('');
+          const [resetNickname, setResetNickname] = useState('');
+          const [resetNewPassword, setResetNewPassword] = useState('');
+          const [resetConfirmPassword, setResetConfirmPassword] = useState('');
           const t = translations[lang];
 
           const avatarEmojis = ['🌟', '✨', '🔮', '🧿', '💫', '⭐', '🌙', '☀️', '🌈', '🦋', '🕊️', '🐉', '🧬', '👁️', '💜', '🔥', '🌸', '🍃', '💎', '🪷'];
@@ -1284,6 +1307,36 @@
             setUserEmail(email);
             setIsGuest(false);
             setShowNicknamePrompt(false);
+          };
+
+          const handleResetPassword = async () => {
+            const email = resetEmail.trim().toLowerCase();
+            const nick = resetNickname.trim();
+            const pw = resetNewPassword.trim();
+            const pw2 = resetConfirmPassword.trim();
+            if (!email || !nick || !pw || !pw2) {
+              setLoginError(t.fillAllFields);
+              return;
+            }
+            if (pw !== pw2) {
+              setLoginError(t.passwordsNoMatch);
+              return;
+            }
+            setLoginError('');
+            setLoginSuccess('');
+            const { data } = await supabase.from('profiles').select('session_id,nickname').eq('email', email).eq('nickname', nick);
+            if (!data || data.length === 0) {
+              setLoginError(t.resetNotFound);
+              return;
+            }
+            const hash = await hashPassword(pw);
+            await supabase.from('profiles').update({ password_hash: hash }).eq('email', email).eq('nickname', nick);
+            setLoginSuccess(t.resetSuccess);
+            setResetEmail('');
+            setResetNickname('');
+            setResetNewPassword('');
+            setResetConfirmPassword('');
+            setTimeout(() => { setShowResetForm(false); setAuthTab('login'); setLoginSuccess(''); }, 2500);
           };
 
           const handleLogout = () => {
@@ -2202,7 +2255,7 @@
                     )}
 
                     {/* Login Tab */}
-                    {authTab === 'login' && (
+                    {authTab === 'login' && !showResetForm && (
                       <>
                         <input
                           type="email"
@@ -2220,10 +2273,56 @@
                           {t.login}
                         </button>
                         <p
+                          onClick={() => { setShowResetForm(true); setLoginError(''); setLoginSuccess(''); }}
+                          style={{color: '#a78bfa', textAlign: 'center', cursor: 'pointer', fontSize: '0.875rem'}}
+                        >
+                          {t.forgotPassword}
+                        </p>
+                        <p
                           onClick={() => { setAuthTab('register'); setLoginError(''); setLoginSuccess(''); }}
                           style={{color: '#a78bfa', textAlign: 'center', cursor: 'pointer', fontSize: '0.875rem'}}
                         >
                           {t.noAccountYet}
+                        </p>
+                      </>
+                    )}
+
+                    {/* Reset Password Form */}
+                    {authTab === 'login' && showResetForm && (
+                      <>
+                        <p className="text-white font-bold text-center" style={{fontSize: '1.05rem'}}>{t.resetPassword}</p>
+                        <input
+                          type="email"
+                          value={resetEmail}
+                          onChange={(e) => { setResetEmail(e.target.value); setLoginError(''); }}
+                          placeholder={t.emailPlaceholder}
+                        />
+                        <input
+                          type="text"
+                          value={resetNickname}
+                          onChange={(e) => { setResetNickname(e.target.value); setLoginError(''); }}
+                          placeholder={t.resetNicknamePlaceholder}
+                        />
+                        <input
+                          type="password"
+                          value={resetNewPassword}
+                          onChange={(e) => { setResetNewPassword(e.target.value); setLoginError(''); }}
+                          placeholder={t.newPasswordPlaceholder}
+                        />
+                        <input
+                          type="password"
+                          value={resetConfirmPassword}
+                          onChange={(e) => { setResetConfirmPassword(e.target.value); setLoginError(''); }}
+                          placeholder={t.confirmPasswordPlaceholder}
+                        />
+                        <button onClick={handleResetPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim() || !resetNickname.trim() || !resetNewPassword.trim() || !resetConfirmPassword.trim()}>
+                          {t.resetPassword}
+                        </button>
+                        <p
+                          onClick={() => { setShowResetForm(false); setLoginError(''); setLoginSuccess(''); }}
+                          style={{color: '#a78bfa', textAlign: 'center', cursor: 'pointer', fontSize: '0.875rem'}}
+                        >
+                          {t.backToLogin}
                         </p>
                       </>
                     )}
