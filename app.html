@@ -1340,16 +1340,13 @@
             setLoginError('');
             setLoginSuccess('');
             try {
+              const token = crypto.randomUUID();
+              const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+              await supabase.from('password_resets').delete().eq('email', email);
+              await supabase.from('password_resets').insert({ email, token, expires_at: expiresAt });
               const appUrl = window.location.origin + window.location.pathname;
-              await fetch(
-                'https://vxzxdkcluyrcftsnxxza.supabase.co/functions/v1/send-reset-email',
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email, appUrl }),
-                }
-              );
-              // Risposta sempre positiva per non rivelare se l'email esiste
+              const resetUrl = `${appUrl}?reset=${token}`;
+              await emailjs.send('service_0qdge8s', 'aewm5nb', { email, reset_url: resetUrl });
               setLoginSuccess(t.resetEmailSent);
               setResetEmail('');
             } catch (err) {
