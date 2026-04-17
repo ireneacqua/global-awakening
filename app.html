@@ -1396,7 +1396,14 @@
               await supabase.from('magic_links').insert({ email, token, expires_at: expiresAt });
               const appUrl = window.location.origin + window.location.pathname;
               const magicUrl = `${appUrl}?magic=${token}`;
-              await emailjs.send('service_rk97p6m', 'template_gy8gdkg', { to_email: email, magic_url: magicUrl });
+              await emailjs.send('service_rk97p6m', 'template_gy8gdkg', {
+                to_email: email,
+                subject: 'Your login link to Global Awakening',
+                message: 'Click here to log in without a password.',
+                magic_url: magicUrl,
+                cta_text: 'Login to Global Awakening',
+                footer: 'This link expires in 15 minutes.'
+              });
               setLoginSuccess(t.magicLinkSent);
               setMagicLinkEmail('');
               setShowMagicLink(false);
@@ -2187,6 +2194,7 @@
             await supabase.from('rituals').update({
               participants: [...ritual.participants, sessionId]
             }).eq('id', ritualId);
+            await supabase.from('ritual_participants').upsert({ ritual_id: ritualId, session_id: sessionId });
             if (ritual.creator && ritual.creator !== nickname) {
               await supabase.from('notifications').insert({
                 user_nickname: ritual.creator,
