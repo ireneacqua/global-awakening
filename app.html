@@ -573,6 +573,10 @@
             resetTokenInvalid: "Link invalid or expired. Please request a new one.",
             resetSuccess: "Password updated! You can now log in.",
             setNewPassword: "Set new password",
+            magicLinkSent: "Email sent! Click the link to log in.",
+            magicLinkInvalid: "Link invalid or expired. Please request a new one.",
+            sendMagicLink: "Send login link",
+            magicLinkHint: "Login without password →",
             guestBadge: "Guest",
             registeredBadge: "Registered",
             registerInvite: "Register to save your profile permanently",
@@ -713,6 +717,10 @@
             resetTokenInvalid: "Link non valido o scaduto. Richiedine uno nuovo.",
             resetSuccess: "Password aggiornata! Puoi ora accedere.",
             setNewPassword: "Imposta nuova password",
+            magicLinkSent: "Email inviata! Clicca il link per accedere.",
+            magicLinkInvalid: "Link non valido o scaduto. Richiedine uno nuovo.",
+            sendMagicLink: "Invia link di accesso",
+            magicLinkHint: "Accedi senza password →",
             guestBadge: "Ospite",
             registeredBadge: "Registrato",
             registerInvite: "Registrati per salvare il profilo in modo permanente",
@@ -923,6 +931,14 @@
             if (tok) window.history.replaceState({}, '', window.location.pathname);
             return tok || '';
           });
+          const [magicToken] = useState(() => {
+            const p = new URLSearchParams(window.location.search);
+            const tok = p.get('magic');
+            if (tok) window.history.replaceState({}, '', window.location.pathname);
+            return tok || '';
+          });
+          const [magicLinkEmail, setMagicLinkEmail] = useState('');
+          const [showMagicLink, setShowMagicLink] = useState(false);
           const t = translations[lang];
 
           const avatarEmojis = ['🌟', '✨', '🔮', '🧿', '💫', '⭐', '🌙', '☀️', '🌈', '🦋', '🕊️', '🐉', '🧬', '👁️', '💜', '🔥', '🌸', '🍃', '💎', '🪷'];
@@ -1366,6 +1382,66 @@
             setResetToken('');
             setTimeout(() => { setAuthTab('login'); setLoginSuccess(''); }, 2500);
           };
+
+          const handleSendMagicLink = async () => {
+            const email = magicLinkEmail.trim().toLowerCase();
+            if (!email) { setLoginError(t.fillAllFields); return; }
+            setLoginError('');
+            setLoginSuccess('');
+            const { data } = await supabase.from('profiles').select('email').eq('email', email);
+            if (!data || data.length === 0) { setLoginError(t.emailNotFound); return; }
+            try {
+              const appUrl = window.location.origin + window.location.pathname;
+              await fetch('https://vxzxdkcluyrcftsnxxza.supabase.co/functions/v1/send-magic-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, appUrl })
+              });
+              setLoginSuccess(t.magicLinkSent);
+              setMagicLinkEmail('');
+              setShowMagicLink(false);
+            } catch(err) {
+              setLoginError('Errore invio email. Riprova.');
+            }
+          };
+
+          useEffect(() => {
+            if (!magicToken) return;
+            const loginWithMagicToken = async () => {
+              const { data: rows } = await supabase.from('magic_links').select('email, expires_at').eq('token', magicToken);
+              if (!rows || rows.length === 0 || new Date(rows[0].expires_at) < new Date()) {
+                setLoginError(t.magicLinkInvalid);
+                return;
+              }
+              const email = rows[0].email;
+              await supabase.from('magic_links').delete().eq('token', magicToken);
+              const { data } = await supabase.from('profiles').select('*').eq('email', email);
+              if (!data || data.length === 0) { setLoginError(t.emailNotFound); return; }
+              const existing = data[0];
+              setSessionId(existing.session_id);
+              localStorage.setItem('ga_session_id', existing.session_id);
+              setUserEmail(email);
+              setIsGuest(false);
+              const loaded = {
+                bio: existing.bio || '',
+                starseedType: existing.starseed_type || '',
+                avatar: existing.avatar || '',
+                country: existing.country || '',
+                interests: existing.interests || [],
+                experienceLevel: existing.experience_level || ''
+              };
+              setProfile(loaded);
+              localStorage.setItem('ga_profile', JSON.stringify(loaded));
+              localStorage.setItem('ga_nickname', existing.nickname || 'Anonymous');
+              localStorage.setItem('ga_email', email);
+              localStorage.setItem('ga_is_guest', 'false');
+              if (existing.telepathy_score) setTotalRounds(existing.telepathy_score);
+              if (existing.telepathy_best) setTotalMatches(existing.telepathy_best);
+              setNickname(existing.nickname || 'Anonymous');
+              setShowNicknamePrompt(false);
+            };
+            loginWithMagicToken();
+          }, [magicToken]);
 
           const handleLogout = () => {
             localStorage.removeItem('ga_nickname');
@@ -2312,6 +2388,25 @@
                         >
                           {t.noAccountYet}
                         </p>
+                        <p
+                          onClick={() => { setShowMagicLink(m => !m); setLoginError(''); setLoginSuccess(''); }}
+                          style={{color: '#c4b5fd', textAlign: 'center', cursor: 'pointer', fontSize: '0.85rem', opacity: 0.8}}
+                        >
+                          {t.magicLinkHint}
+                        </p>
+                        {showMagicLink && (
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem', background: 'rgba(139,92,246,0.1)', borderRadius: '0.75rem', border: '1px solid rgba(139,92,246,0.3)'}}>
+                            <input
+                              type="email"
+                              value={magicLinkEmail}
+                              onChange={(e) => { setMagicLinkEmail(e.target.value); setLoginError(''); }}
+                              placeholder={t.emailPlaceholder}
+                            />
+                            <button onClick={handleSendMagicLink} className="btn-primary" style={{width: '100%'}} disabled={!magicLinkEmail.trim()}>
+                              {t.sendMagicLink}
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
 
