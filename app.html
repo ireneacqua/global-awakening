@@ -1346,7 +1346,7 @@
               await supabase.from('password_resets').insert({ email, token, expires_at: expiresAt });
               const appUrl = window.location.origin + window.location.pathname;
               const resetUrl = `${appUrl}?reset=${token}`;
-              await emailjs.send('service_0qdge8s', 'aewm5nb', { to_email: email, reset_url: resetUrl });
+              await emailjs.send('service_rk97p6m', 'aewm5nb', { to_email: email, reset_url: resetUrl });
               setLoginSuccess(t.resetEmailSent);
               setResetEmail('');
             } catch (err) {
@@ -1396,7 +1396,7 @@
               await supabase.from('magic_links').insert({ email, token, expires_at: expiresAt });
               const appUrl = window.location.origin + window.location.pathname;
               const magicUrl = `${appUrl}?magic=${token}`;
-              await emailjs.send('service_0qdge8s', 'c16fatc', { to_email: email, magic_url: magicUrl });
+              await emailjs.send('service_rk97p6m', 'c16fatc', { to_email: email, magic_url: magicUrl });
               setLoginSuccess(t.magicLinkSent);
               setMagicLinkEmail('');
               setShowMagicLink(false);
