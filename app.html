@@ -1401,7 +1401,8 @@
               setMagicLinkEmail('');
               setShowMagicLink(false);
             } catch(err) {
-              setLoginError('Errore invio email. Riprova.');
+              console.error('EmailJS error:', JSON.stringify(err));
+              setLoginError('Errore: ' + (err.text || err.message || JSON.stringify(err)));
             }
           };
 
