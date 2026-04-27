@@ -52,20 +52,20 @@ async function goToTelepathy(page, nickname) {
 }
 
 async function clickFindPartner(page, nickname) {
-  const btn = page.locator('button:has-text("Abbinamento Random"), button:has-text("Find Partner")').first();
+  const btn = page.locator('button:has-text("Abbinamento Random"), button:has-text("Random Match"), button:has-text("Find Partner")').first();
   await btn.click();
   log(nickname, `Cliccato "Abbinamento Random"`);
 }
 
 async function waitForPartnerFound(page, nickname) {
-  await page.waitForSelector('text=Il tuo ruolo', { timeout: TIMEOUT });
+  await page.waitForSelector('text=/Il tuo ruolo|Your role/', { timeout: TIMEOUT });
   log(nickname, `Partner trovato!`);
 }
 
 async function getRole(page) {
-  await page.waitForSelector('text=Il tuo ruolo', { timeout: TIMEOUT });
+  await page.waitForSelector('text=/Il tuo ruolo|Your role/', { timeout: TIMEOUT });
   // Il ruolo è nel paragrafo immediatamente dopo "Il tuo ruolo"
-  const roleEl = page.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$/ }).first();
+  const roleEl = page.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first();
   const text = await roleEl.textContent({ timeout: TIMEOUT });
   return text.trim();
 }
@@ -76,7 +76,7 @@ async function sendSymbol(page, nickname) {
   await symbols.click();
   log(nickname, `Simbolo selezionato`);
 
-  await page.locator('button:has-text("Invia Telepaticamente")').click();
+  await page.locator('button:has-text("Invia Telepaticamente"), button:has-text("Send Telepathically")').click();
   log(nickname, `Simbolo inviato`);
 }
 
@@ -87,41 +87,41 @@ async function guessSymbol(page, nickname) {
   await symbols.click();
   log(nickname, `Simbolo indovinato (tentativo)`);
 
-  await page.locator('button:has-text("Conferma")').click();
+  await page.locator('button:has-text("Conferma"), button:has-text("Confirm")').first().click();
   log(nickname, `Risposta inviata`);
 }
 
 async function waitForResult(page, nickname) {
   await Promise.race([
-    page.waitForSelector(':text("MATCH TELEPATICO")', { timeout: TIMEOUT }),
-    page.waitForSelector(':text("Non questa volta")', { timeout: TIMEOUT }),
+    page.waitForSelector(':text("MATCH TELEPATICO"), :text("TELEPATHIC MATCH")', { timeout: TIMEOUT }),
+    page.waitForSelector(':text("Non questa volta"), :text("Not this time")', { timeout: TIMEOUT }),
   ]);
-  const matched = await page.locator(':text("MATCH TELEPATICO")').count() > 0;
+  const matched = (await page.locator(':text("MATCH TELEPATICO"), :text("TELEPATHIC MATCH")').count()) > 0;
   log(nickname, `Risultato: ${matched ? '✨ MATCH TELEPATICO!' : 'Non questa volta'}`);
   return matched;
 }
 
 async function clickAncora(page, nickname) {
-  await page.locator('button:has-text("Ancora")').click();
+  await page.locator('button:has-text("Ancora"), button:has-text("Again")').first().click();
   log(nickname, `Cliccato "Ancora"`);
 }
 
 async function clickTerminaSessione(page, nickname) {
-  await page.locator('button:has-text("Termina Sessione")').click();
+  await page.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
   log(nickname, `Cliccato "Termina Sessione"`);
 }
 
 async function waitForLobby(page, nickname) {
-  await page.waitForSelector('button:has-text("Abbinamento Random"), button:has-text("Find Partner")', { timeout: TIMEOUT });
+  await page.waitForSelector('button:has-text("Abbinamento Random"), button:has-text("Random Match"), button:has-text("Find Partner")', { timeout: TIMEOUT });
   log(nickname, `Tornato in lobby`);
 }
 
 // Usata quando l'utente deve prima vedere il banner "partner ha terminato" e cliccare "Torna alla lobby"
 async function waitForLobbyAfterPartnerLeft(page, nickname) {
   // Aspetta il banner di disconnessione e clicca "Torna alla lobby"
-  await page.waitForSelector(':text("ha terminato la sessione")', { timeout: TIMEOUT });
+  await page.waitForSelector(':text("ha terminato la sessione"), :text("ended the session")', { timeout: TIMEOUT });
   log(nickname, `Banner disconnessione ricevuto`);
-  await page.locator('button:has-text("Torna alla lobby")').click();
+  await page.locator('button:has-text("Torna alla lobby"), button:has-text("Back to lobby")').first().click();
   await waitForLobby(page, nickname);
 }
 
@@ -165,7 +165,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     console.log('\n📋 Test 3: Lista utenti online');
     // Aspetta che il polling popoli la lista (10s intervallo)
     await pageA.waitForTimeout(11000);
-    const onlineList = await pageA.locator('button:has-text("Proponi")').count();
+    const onlineList = await pageA.locator('button:has-text("Proponi"), button:has-text("Invite")').count();
     if (onlineList > 0) {
       pass(`TestUserA vede ${onlineList} utente/i con bottone "Proponi"`);
     } else {
@@ -188,8 +188,9 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     console.log('\n📋 Test 5: Round di telepatia');
 
     // Determina chi è sender e chi receiver
-    const roleA = await pageA.locator('p:has-text("Sender"), p:has-text("Receiver")').first().textContent();
-    const isSenderA = roleA.includes('Sender');
+    // Sender/Receiver in EN, Mittente/Ricevitore in IT — l'app default e' EN
+    const roleA = await pageA.locator('p').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+    const isSenderA = roleA.includes('Sender') || roleA.includes('Mittente');
     log('TestUserA', `Ruolo: ${isSenderA ? 'Sender' : 'Receiver'}`);
     log('TestUserB', `Ruolo: ${isSenderA ? 'Receiver' : 'Sender'}`);
 
@@ -231,7 +232,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     await waitForResult(pageA, 'TestUserA');
 
     await clickTerminaSessione(pageA, 'TestUserA');
-    await pageA.waitForSelector('text=Sessione Completata!', { timeout: TIMEOUT });
+    await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
     pass('TestUserA vede la schermata "Sessione Completata"');
 
     // TestUserB vede il banner "partner ha terminato" e clicca "Torna alla lobby"
@@ -243,7 +244,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
 
     // TestUserA torna in lobby (potrebbe essere in "Sessione Completata" o già in lobby)
     try {
-      await pageA.locator('button:has-text("Torna alla Lobby")').click({ timeout: 5000 });
+      await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 5000 });
     } catch { /* già in lobby */ }
     await waitForLobby(pageA, 'TestUserA');
 
@@ -272,7 +273,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
 
       // Verifica che React abbia ricevuto il click (appare "Invito inviato..." nella riga)
       try {
-        await pageA.waitForSelector(':text("Invito inviato...")', { timeout: 5000 });
+        await pageA.waitForSelector(':text("Invito inviato"), :text("Invite sent")', { timeout: 5000 });
         log('TestUserA', 'React ha ricevuto il click — stato UI aggiornato');
       } catch {
         // Logga il contenuto attuale della lista utenti per debug
@@ -306,27 +307,27 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       log('DEBUG', `TestUserB in online_users: ${JSON.stringify(ouData)}`);
 
       // TestUserB vede il banner nell'updatePresence (ogni 10s) — timeout esteso
-      await pageB.waitForSelector(':text("ti vuole fare training telepatico")', { timeout: 35000 });
+      await pageB.waitForSelector(':text("ti vuole fare training telepatico"), :text("wants to do telepathy training")', { timeout: 35000 });
       log('TestUserB', 'Banner invito ricevuto');
-      await pageB.locator('button:has-text("Accetta")').click();
+      await pageB.locator('button:has-text("Accetta"), button:has-text("Accept")').first().click();
       log('TestUserB', 'Invito accettato');
 
       // Entrambi devono essere in sessione
       await Promise.all([
-        pageA.waitForSelector('text=Il tuo ruolo', { timeout: TIMEOUT }),
-        pageB.waitForSelector('text=Il tuo ruolo', { timeout: TIMEOUT }),
+        pageA.waitForSelector('text=/Il tuo ruolo|Your role/', { timeout: TIMEOUT }),
+        pageB.waitForSelector('text=/Il tuo ruolo|Your role/', { timeout: TIMEOUT }),
       ]);
       pass('Invito diretto funziona — entrambi in sessione');
 
       // Pulisci: gioca un round e termina la sessione
-      const roleA2 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$/ }).first().textContent();
-      const isSenderA2 = roleA2.trim() === 'Sender';
+      const roleA2 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+      const isSenderA2 = roleA2.trim() === 'Sender' || roleA2.trim() === 'Mittente';
       await sendSymbol(isSenderA2 ? pageA : pageB, 'S2');
       await guessSymbol(isSenderA2 ? pageB : pageA, 'R2');
       await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
-      await pageA.locator('button:has-text("Termina Sessione")').click();
+      await pageA.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
       await Promise.all([
-        pageA.waitForSelector(':text("Sessione Completata!")', { timeout: TIMEOUT }),
+        pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT }),
         waitForLobbyAfterPartnerLeft(pageB, 'TestUserB'),
       ]);
     }
@@ -335,7 +336,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     console.log('\n📋 Test 9: Chat durante sessione');
 
     // Assicura che entrambi siano in lobby
-    try { await pageA.locator('button:has-text("Torna alla Lobby")').click({ timeout: 3000 }); } catch {}
+    try { await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 3000 }); } catch {}
     await waitForLobby(pageA, 'TestUserA');
 
     // Avvia nuova sessione random
@@ -349,7 +350,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
 
     // Invia un messaggio dalla chat
     const chatMsg = 'Ciao dal test automatico!';
-    await pageA.locator('input[placeholder="Scrivi..."]').fill(chatMsg);
+    await pageA.locator('input[placeholder="Scrivi..."], input[placeholder="Type..."]').first().fill(chatMsg);
     await pageA.locator('button:has-text("➤")').click();
     log('TestUserA', `Messaggio inviato: "${chatMsg}"`);
 
@@ -361,15 +362,15 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     console.log('\n📋 Test 10: Score persistente in Supabase');
 
     // Gioca un round e termina la sessione per triggerare endSession
-    const roleA3 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$/ }).first().textContent();
-    const isSenderA3 = roleA3.trim() === 'Sender';
+    const roleA3 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+    const isSenderA3 = roleA3.trim() === 'Sender' || roleA3.trim() === 'Mittente';
     const sp3 = isSenderA3 ? pageA : pageB;
     const rp3 = isSenderA3 ? pageB : pageA;
     await sendSymbol(sp3, 'S3');
     await guessSymbol(rp3, 'R3');
     await waitForResult(pageA, 'TestUserA');
-    await pageA.locator('button:has-text("Termina Sessione")').click();
-    await pageA.waitForSelector(':text("Sessione Completata!")', { timeout: TIMEOUT });
+    await pageA.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
+    await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
 
     // Controlla Supabase via fetch
     await pageA.waitForTimeout(2000); // attendi che il DB sia scritto
@@ -388,7 +389,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
 
     // Nuova sessione per TestUserB (che deve cliccare Torna alla lobby)
     await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
-    await pageA.locator('button:has-text("Torna alla Lobby")').click();
+    await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click();
     await waitForLobby(pageA, 'TestUserA');
 
     await clickFindPartner(pageA, 'TestUserA');
@@ -400,8 +401,8 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     ]);
     log('TestUserA', 'Sessione avviata per test cambio livello (7 round)');
 
-    const roleA4 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$/ }).first().textContent();
-    const isSenderA4 = roleA4.trim() === 'Sender';
+    const roleA4 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+    const isSenderA4 = roleA4.trim() === 'Sender' || roleA4.trim() === 'Mittente';
     const sp4 = isSenderA4 ? pageA : pageB;
     const rp4 = isSenderA4 ? pageB : pageA;
     const sName4 = isSenderA4 ? 'TestUserA' : 'TestUserB';
@@ -418,8 +419,8 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       log('TestUserA', `Round ${i}/7 completato`);
       // Clicca "Ancora" dopo ogni round (anche il 7°) per tornare alla schermata di gioco
       await Promise.all([
-        pageA.locator('button:has-text("Ancora")').click(),
-        pageB.locator('button:has-text("Ancora")').click(),
+        pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
+        pageB.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
       ]);
       // Attendi che il DB venga aggiornato (clear simboli + round_count avanzato dopo 4s)
       await pageA.waitForTimeout(5000);
@@ -427,15 +428,15 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
 
     // Dopo il 7° round + "Ancora" il banner deve essere visibile (showLevelBanner=true, showResult=false)
     await Promise.all([
-      pageA.waitForSelector(':text("Vuoi cambiare tipo di telepatia")', { timeout: TIMEOUT }),
-      pageB.waitForSelector(':text("Vuoi cambiare tipo di telepatia")', { timeout: TIMEOUT }),
+      pageA.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
+      pageB.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
     ]);
     pass('Banner cambio livello apparso dopo 7 round');
 
     // Entrambi scelgono "Numeri"
     await Promise.all([
-      pageA.locator('button').filter({ hasText: 'Numeri' }).first().click(),
-      pageB.locator('button').filter({ hasText: 'Numeri' }).first().click(),
+      pageA.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click(),
+      pageB.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click(),
     ]);
     log('TestUserA', 'Scelta: Numeri');
     log('TestUserB', 'Scelta: Numeri');
@@ -443,7 +444,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     // Verifica che il livello sia cambiato a "Numeri"
     // Dopo la scelta il banner scompare e si è direttamente in gioco (nessun "Ancora")
     await pageA.waitForTimeout(3000); // attendi sync DB
-    const livelloText = await pageA.locator(':text("Numeri")').count();
+    const livelloText = await pageA.locator(':text("Numeri"), :text("Numbers")').count();
     if (livelloText > 0) {
       pass('Livello cambiato a "Numeri" con successo');
     } else {

@@ -125,10 +125,14 @@ async function cleanup() {
       // NB: usiamo i selettori `> div > span` (child diretti) per matchare *solo* il row-div
       // dell'utente, non tutti i suoi ancestor (che contengono N bottoni "Proponi").
       const bRow = pageA.locator(`div:has(> div > span:text-is("${NICK_B}"))`);
-      proponiBtn = bRow.locator('button:has-text("Proponi")');
+      proponiBtn = bRow.locator('button:has-text("Proponi"), button:has-text("Invite")').first();
       await proponiBtn.waitFor({ timeout: 5000 });
       pass(`${NICK_B} visibile nella lista di ${NICK_A} con bottone "Proponi"`);
     } catch {
+      const aBody = await pageA.evaluate(() => document.body.innerText.substring(0, 800).replace(/\s+/g, ' '));
+      log('DEBUG', `A body (800 char): ${aBody}`);
+      const ouA = await sbFetch(`online_users?nickname=eq.${encodeURIComponent(NICK_B)}&select=id,nickname,last_seen`);
+      log('DEBUG', `B in online_users: ${JSON.stringify(ouA)}`);
       fail(`${NICK_B} NON compare nella lista di ${NICK_A} entro ${POLL_WAIT / 1000}s`);
     }
 
@@ -139,7 +143,7 @@ async function cleanup() {
 
     // "Invito inviato..." deve comparire nella riga di B
     await pageA.waitForTimeout(1000);
-    const inviteSentText = await pageA.locator('span').filter({ hasText: 'Invito inviato' }).count();
+    const inviteSentText = await pageA.locator('span').filter({ hasText: /Invito inviato|Invite sent/ }).count();
     if (inviteSentText > 0) {
       pass('"Invito inviato..." visibile nella lista di A');
     } else {
@@ -160,7 +164,7 @@ async function cleanup() {
 
     // Se il modal Accetta/Rifiuta e' gia' aperto via polling updatePresence,
     // il modal-overlay intercetta i click su tutta la pagina — saltiamo l'apertura del pannello.
-    const modalAlreadyOpenT3 = await pageB.locator('button:has-text("Accetta")').count();
+    const modalAlreadyOpenT3 = await pageB.locator('button:has-text("Accetta"), button:has-text("Accept")').count();
     if (modalAlreadyOpenT3 > 0) {
       log(NICK_B, 'Modal Accetta/Rifiuta gia\' aperto da polling — pannello non necessario');
       pass('Notifica gestita direttamente via polling updatePresence (flusso UX equivalente)');
@@ -178,7 +182,7 @@ async function cleanup() {
       });
       await pageB.waitForTimeout(500);
 
-      const inviteNotif = pageB.locator('span').filter({ hasText: /training telepatico|telepathy/i });
+      const inviteNotif = pageB.locator('span').filter({ hasText: /training telepatico|telepathy training|telepathic|telepatico/i });
       try {
         await inviteNotif.waitFor({ timeout: 3000 });
         pass('Notifica invito telepatico visibile nel pannello di B');
@@ -192,15 +196,15 @@ async function cleanup() {
     // Caso 1: il polling updatePresence (10s) puo' aver gia' settato `incomingInvite`,
     // mostrando il modal in autonomia — l'overlay del modal intercetta il click su "Vai".
     // In quel caso il modal e' gia' apparso "in tempo utile", il test e' soddisfatto.
-    const modalAlreadyOpen = await pageB.locator('button:has-text("Accetta")').count();
+    const modalAlreadyOpen = await pageB.locator('button:has-text("Accetta"), button:has-text("Accept")').count();
     if (modalAlreadyOpen > 0) {
       pass('Modal "Accetta/Rifiuta" gia\' visibile via polling updatePresence (< polling interval)');
     } else {
       const t0 = Date.now();
-      await pageB.locator('button:has-text("Vai")').first().click();
+      await pageB.locator('button:has-text("Vai"), button:has-text("Go")').first().click();
       log(NICK_B, 'Cliccato "Vai"');
       try {
-        await pageB.locator('button:has-text("Accetta")').waitFor({ timeout: 3000 });
+        await pageB.locator('button:has-text("Accetta"), button:has-text("Accept")').first().waitFor({ timeout: 3000 });
         const elapsed = Date.now() - t0;
         pass(`Modal "Accetta/Rifiuta" apparso in ${elapsed}ms (< 3s — senza attendere polling)`);
       } catch {
@@ -210,7 +214,7 @@ async function cleanup() {
 
     // ── Test 5: B accetta → entrambi nel training ──────────────────────────
     console.log('\n📋 Test 5: B accetta → entrambi nel training (tab Telepatia attivo)');
-    await pageB.locator('button:has-text("Accetta")').click();
+    await pageB.locator('button:has-text("Accetta"), button:has-text("Accept")').first().click();
     log(NICK_B, 'Invito accettato');
 
     // B deve essere nel tab Telepatia con il training attivo
@@ -226,7 +230,7 @@ async function cleanup() {
     // mentre "Termina Sessione" appare solo dopo il primo round (showResult=true) — quindi non
     // sarebbe ancora visibile a questo punto.
     try {
-      await pageA.locator('text=Il tuo ruolo').waitFor({ timeout: TIMEOUT });
+      await pageA.locator('text=/Il tuo ruolo|Your role/').waitFor({ timeout: TIMEOUT });
       pass('A nel training telepatico (card "Il tuo ruolo" visibile)');
     } catch {
       fail('A NON nel training telepatico dopo che B ha accettato');
@@ -237,8 +241,8 @@ async function cleanup() {
 
     // Per arrivare al bottone "Termina Sessione" serve almeno un round (showResult=true).
     // I ruoli sono assegnati casualmente in acceptInvite, scopriamo chi e' sender.
-    const roleAText = await pageA.locator('p').filter({ hasText: /^(Sender|Receiver)$/ }).first().textContent();
-    const isSenderA = roleAText.trim() === 'Sender';
+    const roleAText = await pageA.locator('p').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+    const isSenderA = roleAText.trim() === 'Sender' || roleAText.trim() === 'Mittente';
     const senderPage = isSenderA ? pageA : pageB;
     const receiverPage = isSenderA ? pageB : pageA;
     log(NICK_A, `Ruolo: ${isSenderA ? 'Sender' : 'Receiver'} — gioco un round prima di terminare`);
@@ -250,11 +254,11 @@ async function cleanup() {
 
     // Aspetta che entrambi vedano il risultato (cosi' "Termina Sessione" e' disponibile su A)
     await Promise.all([
-      pageA.waitForSelector('text=/MATCH TELEPATICO|Non questa volta/', { timeout: TIMEOUT }),
-      pageB.waitForSelector('text=/MATCH TELEPATICO|Non questa volta/', { timeout: TIMEOUT }),
+      pageA.waitForSelector('text=/MATCH TELEPATICO|TELEPATHIC MATCH|Non questa volta|Not this time/', { timeout: TIMEOUT }),
+      pageB.waitForSelector('text=/MATCH TELEPATICO|TELEPATHIC MATCH|Non questa volta|Not this time/', { timeout: TIMEOUT }),
     ]);
 
-    const terminaBtn = pageA.locator('button:has-text("Termina Sessione")');
+    const terminaBtn = pageA.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first();
     try {
       await terminaBtn.waitFor({ timeout: TIMEOUT });
       await terminaBtn.click();
@@ -268,14 +272,14 @@ async function cleanup() {
     // ha terminato volontariamente — non a chi e' stato terminato (UX bug fix bonus).
     await pageB.waitForTimeout(7000); // attesa max checkPartnerLeft (5s)
 
-    const partnerLeftBanner = await pageB.locator(':text("ha terminato la sessione")').count();
+    const partnerLeftBanner = await pageB.locator(':text("ha terminato la sessione"), :text("ended the session")').count();
     if (partnerLeftBanner > 0) {
       pass('B vede il banner "partner ha terminato la sessione"');
     } else {
       fail('B NON vede il banner "partner ha terminato la sessione"');
     }
 
-    const ancoraBtn = await pageB.locator('button:has-text("Ancora")').count();
+    const ancoraBtn = await pageB.locator('button:has-text("Ancora"), button:has-text("Again")').count();
     if (ancoraBtn === 0) {
       pass('Bottone "Ancora" NON disponibile per B (corretto)');
     } else {
@@ -285,13 +289,13 @@ async function cleanup() {
     // ── Test 7: A invia secondo invito → B riceve → B rifiuta ────────────
     console.log('\n📋 Test 7: Secondo invito → B rifiuta → A riceve notifica');
     // A torna alla lobby
-    await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Torna alla lobby")').first().click();
+    await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Torna alla lobby"), button:has-text("Back to Lobby"), button:has-text("Back to lobby")').first().click();
     log(NICK_A, 'Tornato alla lobby');
     await pageA.waitForTimeout(1000);
 
     // A invia secondo invito (stesso selettore robusto del test 1)
     const bRow2 = pageA.locator(`div:has(> div > span:text-is("${NICK_B}"))`);
-    const proponi2 = bRow2.locator('button:has-text("Proponi")');
+    const proponi2 = bRow2.locator('button:has-text("Proponi"), button:has-text("Invite")').first();
     try {
       await proponi2.waitFor({ timeout: POLL_WAIT });
       await proponi2.click();
@@ -305,21 +309,21 @@ async function cleanup() {
     log(NICK_B, `Aspetto seconda notifica (max ${POLL_WAIT / 1000}s)...`);
     try {
       await pageB.waitForFunction(
-        () => document.body.innerText.includes('training telepatico'),
+        () => document.body.innerText.includes('training telepatico') || document.body.innerText.toLowerCase().includes('telepathy training'),
         { timeout: POLL_WAIT }
       );
     } catch {}
 
     // Caso 1: il modal Accetta/Rifiuta puo' gia' essere aperto via polling updatePresence
     // (stesso pattern del test 4) — in quel caso saltare il flusso "Vai".
-    const modalAlreadyOpenT7 = await pageB.locator('button:has-text("Rifiuta")').count();
+    const modalAlreadyOpenT7 = await pageB.locator('button:has-text("Rifiuta"), button:has-text("Decline")').count();
     if (modalAlreadyOpenT7 > 0) {
       log(NICK_B, 'Modal secondo invito gia\' aperto via polling — skip click "Vai"');
     } else {
       // Apri pannello notifiche di B e clicca "Vai"
       await pageB.locator('button').nth(0).click().catch(() => {});
       await pageB.waitForTimeout(500);
-      const vaiBtn2 = pageB.locator('button:has-text("Vai")');
+      const vaiBtn2 = pageB.locator('button:has-text("Vai"), button:has-text("Go")').first();
       try {
         await vaiBtn2.waitFor({ timeout: 3000 });
         await vaiBtn2.click();
@@ -331,8 +335,8 @@ async function cleanup() {
 
     // Modal deve apparire — B rifiuta
     try {
-      await pageB.locator('button:has-text("Rifiuta")').waitFor({ timeout: 5000 });
-      await pageB.locator('button:has-text("Rifiuta")').click();
+      await pageB.locator('button:has-text("Rifiuta"), button:has-text("Decline")').first().waitFor({ timeout: 5000 });
+      await pageB.locator('button:has-text("Rifiuta"), button:has-text("Decline")').first().click();
       log(NICK_B, 'Invito rifiutato');
       pass('B ha rifiutato il secondo invito');
     } catch {
