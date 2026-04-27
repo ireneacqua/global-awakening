@@ -102,8 +102,15 @@
             url += this._filters.join('&');
             try {
               const res = await fetch(url, { method: 'DELETE', headers: SB_HEADERS });
-              return resolve({ error: null });
-            } catch(e) { return resolve({ error: e }); }
+              if (!res.ok) {
+                let body = null;
+                try { body = await res.json(); } catch(_) {}
+                return resolve({ data: null, error: body || { status: res.status, message: res.statusText } });
+              }
+              let data = null;
+              try { data = await res.json(); } catch(_) {}
+              return resolve({ data, error: null });
+            } catch(e) { return resolve({ data: null, error: e }); }
           };
           return ctx;
         }
@@ -1154,6 +1161,28 @@
 
               if (queue && queue.length > 0) {
                 const available = queue[0];
+
+                // Re-check pre-insert: tra il primo SELECT (riga sopra) e l'INSERT, un altro
+                // client puo' avermi appena matchato o aver matchato 'available' con un terzo.
+                // NB: lato DB serve anche un UNIQUE constraint su (LEAST(u1,u2),GREATEST(u1,u2))
+                // per chiudere completamente la race. Questo client-side dedup la mitiga.
+                const { data: precheck } = await supabase.from('telepathy_matches').select('*');
+                const existingForMe = (precheck || []).find(m => m.user1_id === sessionId || m.user2_id === sessionId);
+                if (existingForMe) {
+                  const amUser1 = existingForMe.user1_id === sessionId;
+                  setPartner({ id: amUser1 ? existingForMe.user2_id : existingForMe.user1_id, nickname: amUser1 ? existingForMe.user2_nickname : existingForMe.user1_nickname });
+                  setRole(amUser1 ? existingForMe.user1_role : existingForMe.user2_role);
+                  setMatchId(existingForMe.id);
+                  setSearchingPartner(false);
+                  await supabase.from('telepathy_queue').delete().eq('id', sessionId);
+                  return;
+                }
+                const existingForThem = (precheck || []).find(m => m.user1_id === available.id || m.user2_id === available.id);
+                if (existingForThem) {
+                  // available e' stato matchato con qualcun altro: prossimo tick rifara' lookup
+                  return;
+                }
+
                 const myRole = Math.random() > 0.5 ? 'sender' : 'receiver';
                 const theirRole = myRole === 'sender' ? 'receiver' : 'sender';
 
@@ -1167,16 +1196,38 @@
                   user2_role: myRole
                 });
 
-                if (matchData && matchData.length > 0) {
-                  setMatchId(matchData[0].id);
+                if (!matchData || matchData.length === 0) {
+                  // INSERT fallita (probabile race con unique constraint o errore HTTP): retry next tick
+                  return;
                 }
+
+                // Post-insert dedup: se entrambi i client hanno fatto INSERT in parallelo, il match
+                // piu' vecchio (per created_at) vince. Cancello eventuali duplicati per la stessa coppia.
+                const { data: postcheck } = await supabase.from('telepathy_matches').select('*');
+                const pairMatches = (postcheck || []).filter(m =>
+                  (m.user1_id === sessionId && m.user2_id === available.id) ||
+                  (m.user2_id === sessionId && m.user1_id === available.id)
+                );
+                let winner = matchData[0];
+                if (pairMatches.length > 1) {
+                  pairMatches.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                  winner = pairMatches[0];
+                  for (const m of pairMatches) {
+                    if (m.id !== winner.id) {
+                      await supabase.from('telepathy_matches').delete().eq('id', m.id);
+                    }
+                  }
+                }
+
+                const amUser1 = winner.user1_id === sessionId;
+                setPartner({ id: amUser1 ? winner.user2_id : winner.user1_id, nickname: amUser1 ? winner.user2_nickname : winner.user1_nickname });
+                setRole(amUser1 ? winner.user1_role : winner.user2_role);
+                setMatchId(winner.id);
 
                 // Remove both from queue
                 await supabase.from('telepathy_queue').delete().eq('id', sessionId);
                 await supabase.from('telepathy_queue').delete().eq('id', available.id);
 
-                setPartner(available);
-                setRole(myRole);
                 setSearchingPartner(false);
               } else {
                 // Add self to queue
@@ -1471,6 +1522,8 @@
             localStorage.removeItem('ga_is_guest');
             localStorage.removeItem('ga_profile');
             localStorage.removeItem('ga_session_id');
+            localStorage.removeItem('telepathy_score');
+            localStorage.removeItem('telepathy_best');
             setNickname('');
             setUserEmail('');
             setIsGuest(false);
@@ -1482,6 +1535,10 @@
             setLoginSuccess('');
             setAuthTab('guest');
             setProfile({ bio: '', starseedType: '', avatar: '', country: '', interests: [], experienceLevel: '' });
+            setTotalRounds(0);
+            setTotalMatches(0);
+            setSessionMatches(0);
+            setRoundCount(0);
             setShowNicknamePrompt(true);
           };
 
@@ -1529,6 +1586,8 @@
                 // Il partner ha abbandonato la sessione — forza fine sessione su questo lato
                 setPartnerDisconnected(true);
                 setSessionEnded(true);
+                setShowResult(false);
+                setWaitingForPartner(false);
                 return;
               }
               const match = data[0];
@@ -1633,6 +1692,8 @@
               if (!data || data.length === 0) {
                 setPartnerDisconnected(true);
                 setSessionEnded(true);
+                setShowResult(false);
+                setWaitingForPartner(false);
                 return;
               }
               // Controlla last_seen del partner
@@ -1644,7 +1705,7 @@
                 }
               }
             };
-            const interval = setInterval(checkPartnerLeft, 5000);
+            const interval = setInterval(checkPartnerLeft, 2000);
             return () => clearInterval(interval);
           }, [matchId, partner]);
 
@@ -1759,6 +1820,18 @@
           }, [matchId, role, waitingForPartner, showResult]);
 
           const resetTelepathy = () => {
+            // Se l'utente abbandona una sessione attiva (non terminata via endSession),
+            // cancella match/queue/inviti per non lasciare il partner appeso
+            // e per evitare di tornare in lobby ancora "in match" dal punto di vista DB.
+            const oldMatchId = matchId;
+            if (oldMatchId) {
+              supabase.from('telepathy_matches').delete().eq('id', oldMatchId);
+              supabase.from('telepathy_chat').delete().eq('match_id', oldMatchId);
+            }
+            if (sessionId) {
+              supabase.from('telepathy_queue').delete().eq('id', sessionId);
+              supabase.from('telepathy_invites').delete().eq('from_id', sessionId);
+            }
             lastProcessedRoundRef.current = -1;
             myLevelChoiceRef.current = null;
             setPartner(null);
@@ -1954,6 +2027,13 @@
           };
 
           const endSession = async () => {
+            // Idempotente: doppio click / re-trigger non somma due volte i round della sessione
+            if (sessionEnded) return;
+            setSessionEnded(true);
+            // Nasconde subito la schermata showResult (con bottoni "Ancora" e "Termina Sessione")
+            // per chi ha cliccato — altrimenti convivono con la schermata "Sessione Completata".
+            setShowResult(false);
+            setWaitingForPartner(false);
             try {
               const userId = userEmail || sessionId;
               const { data: existing } = await supabase.from('telepathy_scores').select('*').eq('user_id', userId);
@@ -1985,7 +2065,6 @@
               console.warn('endSession error:', err);
             } finally {
               setMatchId(null); // ferma checkPartnerLeft per non sovrascrivere la schermata
-              setSessionEnded(true);
             }
           };
 
@@ -2640,8 +2719,18 @@
                       <div className="text-2xl font-bold" style={{color: '#fbbf24'}}>{totalRounds}</div>
                       <div className="text-secondary text-xs">Rounds Played</div>
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold" style={{color: '#4ade80'}}>{onlineUsers.length}</div>
+                    <div
+                      onClick={() => {
+                        setActiveTab('consciousness');
+                        // Aspetta il re-render del tab consciousness, poi scrolla a Community
+                        setTimeout(() => {
+                          document.getElementById('community-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+                      }}
+                      style={{cursor: 'pointer'}}
+                      title="Vedi gli utenti online (Community)"
+                    >
+                      <div className="text-2xl font-bold" style={{color: '#4ade80', textDecoration: 'underline', textDecorationColor: 'rgba(74,222,128,0.4)', textUnderlineOffset: '0.2rem'}}>{onlineUsers.length}</div>
                       <div className="text-secondary text-xs">Online Now</div>
                     </div>
                   </div>
@@ -2943,7 +3032,7 @@
                       </div>
 
                       {/* Community List */}
-                      <div className="mt-6">
+                      <div id="community-section" className="mt-6">
                         <h3 className="text-xl font-bold text-white mb-3">{t.social.community}</h3>
                         <div className="bg-glass rounded-2xl border-glass p-4" style={{maxHeight: '300px', overflowY: 'auto'}}>
                           {onlineUsers.map(user => (
@@ -3154,7 +3243,7 @@
                             </div>
                           )}
 
-                          {showResult && (
+                          {showResult && !partnerDisconnected && !sessionEnded && (
                             <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                               <div className={`${isMatch ? 'result-success' : 'result-try-again'} rounded-xl p-6 text-center`}>
                                 <div style={{fontSize: '4rem'}} className="mb-4">{isMatch ? '✨' : '🌟'}</div>
@@ -3180,7 +3269,7 @@
                             </div>
                           )}
 
-                          {sessionEnded && (
+                          {sessionEnded && !partnerDisconnected && (
                             <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                               <div className="bg-glass-dark rounded-xl p-6 text-center">
                                 <div style={{fontSize: '4rem'}} className="mb-4">🌟</div>
