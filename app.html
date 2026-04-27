@@ -1361,25 +1361,39 @@
             if (pw !== pw2) { setLoginError(t.passwordsNoMatch); return; }
             setLoginError('');
             setLoginSuccess('');
-            // Verifica token nel DB
-            const { data: row } = await supabase
-              .from('password_resets')
-              .select('email, expires_at')
-              .eq('token', resetToken)
-              .single();
-            if (!row || new Date(row.expires_at) < new Date()) {
-              setLoginError(t.resetTokenInvalid);
+            try {
+              const { data: rows, error: selErr } = await supabase
+                .from('password_resets')
+                .select('email, expires_at')
+                .eq('token', resetToken);
+              const row = rows && rows[0];
+              if (selErr || !row || new Date(row.expires_at) < new Date()) {
+                setLoginError(t.resetTokenInvalid);
+                setResetToken('');
+                return;
+              }
+              const hash = await hashPassword(pw);
+              const { data: updData, error: updErr } = await supabase
+                .from('profiles')
+                .update({ password_hash: hash })
+                .eq('email', row.email);
+              if (updErr) {
+                setLoginError('Errore aggiornamento password: ' + (updErr.message || updErr.code || JSON.stringify(updErr)));
+                return;
+              }
+              if (!updData || updData.length === 0) {
+                setLoginError('Nessun account trovato per questa email.');
+                return;
+              }
+              await supabase.from('password_resets').delete().eq('token', resetToken);
+              setLoginSuccess(t.resetSuccess);
+              setResetNewPassword('');
+              setResetConfirmPassword('');
               setResetToken('');
-              return;
+              setTimeout(() => { setAuthTab('login'); setLoginSuccess(''); }, 2500);
+            } catch (err) {
+              setLoginError('Errore: ' + (err.message || String(err)));
             }
-            const hash = await hashPassword(pw);
-            await supabase.from('profiles').update({ password_hash: hash }).eq('email', row.email);
-            await supabase.from('password_resets').delete().eq('token', resetToken);
-            setLoginSuccess(t.resetSuccess);
-            setResetNewPassword('');
-            setResetConfirmPassword('');
-            setResetToken('');
-            setTimeout(() => { setAuthTab('login'); setLoginSuccess(''); }, 2500);
           };
 
           const handleSendMagicLink = async () => {
@@ -2327,7 +2341,8 @@
                     <p className="text-secondary text-sm">{t.subtitle}</p>
                   </div>
 
-                  {/* Auth Tabs */}
+                  {/* Auth Tabs — nascosti durante il reset password via link email */}
+                  {!resetToken && (
                   <div style={{display: 'flex', gap: '0', marginBottom: '1.5rem', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)'}}>
                     {['guest', 'login', 'register'].map(tab => (
                       <button
@@ -2350,10 +2365,11 @@
                       </button>
                     ))}
                   </div>
+                  )}
 
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
                     {/* Guest Tab */}
-                    {authTab === 'guest' && (
+                    {authTab === 'guest' && !resetToken && (
                       <>
                         <input
                           type="text"
@@ -2368,7 +2384,7 @@
                     )}
 
                     {/* Login Tab */}
-                    {authTab === 'login' && !showResetForm && (
+                    {authTab === 'login' && !showResetForm && !resetToken && (
                       <>
                         <input
                           type="email"
@@ -2421,7 +2437,7 @@
 
                     {/* Reset Password Form */}
                     {/* Reset Step 1: inserisci email */}
-                    {authTab === 'login' && showResetForm && (
+                    {authTab === 'login' && showResetForm && !resetToken && (
                       <>
                         <p className="text-white font-bold text-center" style={{fontSize: '1.05rem'}}>{t.resetPassword}</p>
                         <input
@@ -2465,7 +2481,7 @@
                     )}
 
                     {/* Register Tab */}
-                    {authTab === 'register' && (
+                    {authTab === 'register' && !resetToken && (
                       <>
                         <input
                           type="text"
