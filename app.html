@@ -116,7 +116,23 @@
         }
       }),
 
-      channel() { return { on() { return this; }, subscribe() { return this; }, unsubscribe() {} }; }
+      channel() { return { on() { return this; }, subscribe() { return this; }, unsubscribe() {} }; },
+
+      // Chiamata a Postgres RPC (function) via PostgREST. Per RETURNS VOID i dati
+      // sono null/vuoti; per RETURNS TABLE arriva un array di oggetti.
+      rpc: async (fn, params) => {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+            method: 'POST',
+            headers: SB_HEADERS,
+            body: JSON.stringify(params || {})
+          });
+          let data = null;
+          try { data = await res.json(); } catch(_) {}
+          if (!res.ok) return { data: null, error: data || { status: res.status, message: res.statusText } };
+          return { data, error: null };
+        } catch(e) { return { data: null, error: e }; }
+      }
     };
     </script>
     <style>
@@ -1445,36 +1461,29 @@
             setLoginSuccess('');
           };
 
-          // Migra i round/matches accumulati come guest (user_id = sessionId casuale) verso
-          // l'account appena loggato/registrato (user_id = email). Senza questa fusione, i
-          // dati guest restano orfani in telepathy_scores ad ogni login/register.
+          // Fonde round/matches del guest (user_id = sessionId casuale) sull'account appena
+          // loggato/registrato (user_id = email). Tutta la transazione (sum + upsert + delete
+          // riga guest) avviene server-side nella RPC merge_telepathy_scores con SECURITY
+          // DEFINER — bypassa la policy DELETE auth.uid che altrimenti lascerebbe la riga
+          // guest orfana.
           const mergeGuestTelepathyData = async (oldSid, newUserId, currentNickname) => {
             if (!oldSid || !newUserId || oldSid === newUserId) return null;
-            const { data: guestData } = await supabase.from('telepathy_scores').select('*').eq('user_id', oldSid);
-            if (!guestData || guestData.length === 0) return null;
-            const guest = guestData[0];
-            const guestHasData = (guest.rounds_count || 0) > 0 || (guest.matches_count || 0) > 0 || (guest.sessions_count || 0) > 0;
-            if (!guestHasData) {
-              await supabase.from('telepathy_scores').delete().eq('user_id', oldSid);
+            const { data, error } = await supabase.rpc('merge_telepathy_scores', {
+              p_old_user_id: oldSid,
+              p_new_user_id: newUserId,
+              p_nickname: currentNickname || 'Anonymous'
+            });
+            if (error) {
+              console.warn('merge_telepathy_scores rpc failed', error);
               return null;
             }
-            const { data: userData } = await supabase.from('telepathy_scores').select('*').eq('user_id', newUserId);
-            const user = (userData && userData.length > 0) ? userData[0] : { sessions_count: 0, matches_count: 0, rounds_count: 0 };
-            const merged = {
-              sessions_count: (user.sessions_count || 0) + (guest.sessions_count || 0),
-              matches_count: (user.matches_count || 0) + (guest.matches_count || 0),
-              rounds_count: (user.rounds_count || 0) + (guest.rounds_count || 0)
+            if (!Array.isArray(data) || data.length === 0) return null;
+            const row = data[0];
+            return {
+              rounds_count: row.out_rounds || 0,
+              matches_count: row.out_matches || 0,
+              sessions_count: row.out_sessions || 0
             };
-            await supabase.from('telepathy_scores').upsert({
-              user_id: newUserId,
-              nickname: currentNickname || 'Anonymous',
-              sessions_count: merged.sessions_count,
-              matches_count: merged.matches_count,
-              rounds_count: merged.rounds_count,
-              updated_at: new Date().toISOString()
-            });
-            await supabase.from('telepathy_scores').delete().eq('user_id', oldSid);
-            return merged;
           };
 
           const handleLogin = async () => {
@@ -2301,18 +2310,20 @@
             setWaitingForPartner(false);
             try {
               const userId = userEmail || sessionId;
-              const { data: existing } = await supabase.from('telepathy_scores').select('*').eq('user_id', userId);
-              const prev = (existing && existing.length > 0) ? existing[0] : { sessions_count: 0, matches_count: 0, rounds_count: 0 };
-              const newRounds = (prev.rounds_count || 0) + roundCount;
-              const newMatches = (prev.matches_count || 0) + sessionMatches;
-              await supabase.from('telepathy_scores').upsert({
-                user_id: userId,
-                nickname: nickname || 'Anonymous',
-                sessions_count: (prev.sessions_count || 0) + 1,
-                matches_count: newMatches,
-                rounds_count: newRounds,
-                updated_at: new Date().toISOString()
+              // Increment atomico server-side via RPC (SECURITY DEFINER): elimina la race
+              // del precedente read-modify-write quando lo stesso utente apre 2 tab e
+              // chiude la sessione contemporaneamente. Niente piu' upsert diretto.
+              const { error: rpcErr } = await supabase.rpc('increment_telepathy_score', {
+                p_user_id: userId,
+                p_nickname: nickname || 'Anonymous',
+                p_rounds: roundCount,
+                p_matches: sessionMatches
               });
+              if (rpcErr) console.warn('increment_telepathy_score failed', rpcErr);
+              // Rilegge i totali autorevoli per aggiornare UI/localStorage/profile.
+              const { data: updated } = await supabase.from('telepathy_scores').select('rounds_count,matches_count').eq('user_id', userId);
+              const newRounds = (updated && updated[0]) ? (updated[0].rounds_count || 0) : (totalRounds + roundCount);
+              const newMatches = (updated && updated[0]) ? (updated[0].matches_count || 0) : (totalMatches + sessionMatches);
               setTotalRounds(newRounds);
               setTotalMatches(newMatches);
               localStorage.setItem('telepathy_score', String(newRounds));
