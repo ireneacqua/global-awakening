@@ -2476,7 +2476,7 @@
 
           const sendPrivateMessage = async (receiverName, text) => {
             if (!text.trim() || !receiverName) return;
-            const { error } = await supabase.from('private_messages').insert({
+            const { data, error } = await supabase.from('private_messages').insert({
               sender_id: sessionId,
               sender_name: nickname || 'Anonymous',
               receiver_name: receiverName,
@@ -2484,6 +2484,11 @@
               is_read: false
             });
             if (!error) {
+              // Optimistic UI: aggiungi subito il messaggio allo stato locale cosi'
+              // il mittente lo vede senza aspettare il prossimo poll (ogni 8s).
+              if (Array.isArray(data) && data.length > 0) {
+                setPrivateMessages(prev => [...prev, data[0]]);
+              }
               await supabase.from('notifications').insert({
                 user_nickname: receiverName,
                 type: 'private_message',

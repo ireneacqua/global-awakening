@@ -26,9 +26,15 @@ function fail(msg) { console.log(`  ❌ ${msg}`); process.exitCode = 1; }
 
 async function loginAsGuest(page, nickname) {
   await page.goto(APP_URL);
+  // La UI parte in EN; il test usa selettori italiani → switcho a IT cliccando 🌐 EN
+  const langBtn = page.locator('button:has-text("🌐 EN")').first();
+  if (await langBtn.count() > 0) {
+    await langBtn.click();
+    await page.waitForSelector('button:has-text("🌐 IT")', { timeout: TIMEOUT });
+  }
   await page.waitForSelector('button:has-text("Ospite"), button:has-text("Guest")', { timeout: TIMEOUT });
   await page.locator('button:has-text("Ospite"), button:has-text("Guest")').first().click();
-  await page.locator('input[placeholder*="username"], input[placeholder*="Username"]').first().fill(nickname);
+  await page.locator('input[placeholder*="username"], input[placeholder*="Username"], input[placeholder*="Nickname"], input[placeholder*="nickname"]').first().fill(nickname);
   await page.locator('button:has-text("Entra come Ospite"), button:has-text("Enter as Guest")').click();
   await page.waitForSelector('button:has-text("Logout"), button:has-text("Esci")', { timeout: TIMEOUT });
   log(nickname, 'Login come ospite completato');
@@ -36,24 +42,28 @@ async function loginAsGuest(page, nickname) {
 
 async function goToTelepathy(page, nickname) {
   await page.locator('button').filter({ hasText: /Telepatia|Telepathy/ }).first().click();
-  await page.waitForSelector('text=Telepathy Training', { timeout: TIMEOUT });
+  await page.waitForSelector(':text("Telepathy Training"), :text("Allenamento Telepatico")', { timeout: TIMEOUT });
   log(nickname, 'Tab Telepatia aperto');
 }
 
 async function clickFindPartner(page, nickname) {
-  await page.locator('button:has-text("Abbinamento Random"), button:has-text("Find Partner")').first().click();
-  log(nickname, 'Cliccato "Abbinamento Random"');
+  await page.locator('button:has-text("Abbinamento Random"), button:has-text("Random Match")').first().click();
+  log(nickname, 'Cliccato "Random Match"');
 }
 
 async function waitForPartnerFound(page, nickname) {
-  await page.waitForSelector('text=Il tuo ruolo', { timeout: TIMEOUT });
+  await page.waitForSelector('text=/Il tuo ruolo|Your role/', { timeout: TIMEOUT });
   log(nickname, 'Partner trovato!');
 }
 
 // Ritorna 'sender' | 'receiver'
 async function getRole(page) {
-  const el = page.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$/ }).first();
-  return (await el.textContent({ timeout: TIMEOUT })).trim().toLowerCase();
+  const el = page.locator('p.text-white.font-bold').filter({ hasText: /^Sender$|^Receiver$|^Mittente$|^Ricevitore$/ }).first();
+  const txt = (await el.textContent({ timeout: TIMEOUT })).trim().toLowerCase();
+  // Normalizza in 'sender'/'receiver' (codice valuta su questo)
+  if (txt === 'mittente') return 'sender';
+  if (txt === 'ricevitore') return 'receiver';
+  return txt;
 }
 
 async function sendSymbol(page, label) {
