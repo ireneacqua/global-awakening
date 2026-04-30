@@ -1286,8 +1286,8 @@
                   const endTime = new Date(new Date(`${r.date}T${r.time}Z`).getTime() + r.duration * 60000);
                   return now > endTime;
                 });
-                for (const r of expired) {
-                  await supabase.from('rituals').delete().eq('id', r.id);
+                if (expired.length > 0) {
+                  await supabase.rpc('cleanup_expired_rituals');
                 }
                 setRituals(ritualsData.filter(r => !expired.find(e => e.id === r.id)));
               }
@@ -2525,13 +2525,24 @@
             };
 
             try {
-              const { data, error } = await supabase.from('rituals').insert(ritualData).select();
+              const { data, error } = await supabase.rpc('create_ritual', {
+                p_creator: ritualData.creator,
+                p_creator_id: ritualData.creator_id,
+                p_name: ritualData.name,
+                p_description: ritualData.description,
+                p_type: ritualData.type,
+                p_sacred_number: ritualData.sacred_number,
+                p_date: ritualData.date,
+                p_time: ritualData.time,
+                p_duration: ritualData.duration
+              });
 
               if (error) {
-                console.warn('Supabase insert error:', error);
-                // Fallback: add locally so the user sees it
+                console.warn('Supabase RPC create_ritual error:', error);
                 const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
                 setRituals(prev => [localRitual, ...prev]);
+              } else if (Array.isArray(data) && data[0]) {
+                setRituals(prev => [data[0], ...prev]);
               }
             } catch (err) {
               console.warn('Create ritual failed:', err);
@@ -2555,28 +2566,23 @@
             const now = new Date();
             const utcDate = now.toISOString().slice(0, 10);
             const utcTime = now.toISOString().slice(11, 16);
-            await supabase.from('rituals').insert({
-              creator: nickname || 'Anonymous',
-              creator_id: sessionId,
-              name: '⚡ Test Ritual',
-              description: 'Rituale di test — scade in 3 minuti',
-              type: 'consciousness',
-              sacred_number: 11,
-              date: utcDate,
-              time: utcTime,
-              duration: 3,
-              participants: [sessionId],
-              energy: 0
+            await supabase.rpc('create_ritual', {
+              p_creator: nickname || 'Anonymous',
+              p_creator_id: sessionId,
+              p_name: '⚡ Test Ritual',
+              p_description: 'Rituale di test — scade in 3 minuti',
+              p_type: 'consciousness',
+              p_sacred_number: 11,
+              p_date: utcDate,
+              p_time: utcTime,
+              p_duration: 3
             });
           };
 
           const joinRitual = async (ritualId) => {
             const ritual = rituals.find(r => r.id === ritualId);
             if (!ritual || ritual.participants.includes(sessionId)) return;
-            await supabase.from('rituals').update({
-              participants: [...ritual.participants, sessionId]
-            }).eq('id', ritualId);
-            await supabase.from('ritual_participants').upsert({ ritual_id: ritualId, session_id: sessionId });
+            await supabase.rpc('join_ritual', { p_ritual_id: ritualId, p_session_id: sessionId });
             if (ritual.creator && ritual.creator !== nickname) {
               await supabase.from('notifications').insert({
                 user_nickname: ritual.creator,
@@ -2589,10 +2595,7 @@
           const sendEnergy = async (ritualId) => {
             const ritual = rituals.find(r => r.id === ritualId);
             if (!ritual) return;
-            
-            await supabase.from('rituals').update({
-              energy: ritual.energy + 10
-            }).eq('id', ritualId);
+            await supabase.rpc('send_ritual_energy', { p_ritual_id: ritualId, p_amount: 10 });
           };
 
           const getRitualStatus = (ritual) => {
@@ -2623,11 +2626,11 @@
           const createRitualComment = async (ritualId) => {
             const content = (newRitualCommentContents[ritualId] || '').trim();
             if (!content) return;
-            const { data } = await supabase.from('ritual_comments').insert({
-              ritual_id: ritualId,
-              author_nickname: nickname,
-              content
-            }).select();
+            const { data } = await supabase.rpc('create_ritual_comment', {
+              p_ritual_id: ritualId,
+              p_author_nickname: nickname,
+              p_content: content
+            });
             if (data && data.length > 0) {
               setRitualCommentsMap(prev => ({ ...prev, [ritualId]: [...(prev[ritualId] || []), ...data] }));
               setNewRitualCommentContents(prev => ({ ...prev, [ritualId]: '' }));
