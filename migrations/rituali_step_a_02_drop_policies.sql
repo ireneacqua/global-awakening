@@ -10,36 +10,23 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- STEP 0 · INVENTARIO POLICY ESISTENTI (eseguire PRIMA, copiare l'output)
+-- STEP 0 · INVENTARIO POLICY ESISTENTI (verificato 2026-05-04)
 -- ----------------------------------------------------------------------------
--- Lanciare questa query per ottenere i nomi reali delle policy da droppare.
--- I CREATE POLICY del progetto Supabase potrebbero avere nomi diversi da
--- quelli ipotizzati sotto.
+-- Output reale del progetto Supabase `vxzxdkcluyrcftsnxxza`:
 --
---   SELECT schemaname, tablename, policyname, cmd, roles, qual, with_check
---     FROM pg_policies
---    WHERE tablename IN ('rituals','ritual_comments')
---    ORDER BY tablename, cmd, policyname;
+--   tablename | policyname             | cmd | qual | with_check
+--   ----------+------------------------+-----+------+-----------
+--   rituals   | Allow all              | ALL | true | true
+--   rituals   | Enable all for rituals | ALL | true | true
 --
--- Atteso pattern: una o più policy "Allow all"/"anon all"/"public all" con
--- qual = 'true' che coprono ALL/INSERT/UPDATE/DELETE.
+-- ritual_comments: ZERO policy → significa RLS=off su quella tabella.
+-- Nessun DROP serve, ma serve abilitare RLS + creare policy SELECT (vedi STEP 2).
 
 -- ----------------------------------------------------------------------------
--- STEP 1 · DROP delle policy aperte
+-- STEP 1 · DROP delle policy aperte su `rituals`
 -- ----------------------------------------------------------------------------
--- ⚠ Sostituire i nomi nei DROP qui sotto con quelli ottenuti da pg_policies.
--- I nomi commentati sono i pattern presunti dall'audit telepathy precedente,
--- ma vanno verificati e adattati.
-
--- ESEMPI da personalizzare (commentati per evitare esecuzioni accidentali):
---
---   DROP POLICY IF EXISTS "Allow all" ON rituals;
---   DROP POLICY IF EXISTS "anon all" ON rituals;
---   DROP POLICY IF EXISTS "Enable read access for all users" ON rituals;
---   DROP POLICY IF EXISTS "Allow all" ON ritual_comments;
---   DROP POLICY IF EXISTS "anon all" ON ritual_comments;
-
--- ⚠ Decommentare e adattare ai nomi reali prima di eseguire.
+DROP POLICY IF EXISTS "Allow all"              ON rituals;
+DROP POLICY IF EXISTS "Enable all for rituals" ON rituals;
 
 -- ----------------------------------------------------------------------------
 -- STEP 2 · ENABLE RLS (se non già attivo) e ricostruire SOLO policy SELECT

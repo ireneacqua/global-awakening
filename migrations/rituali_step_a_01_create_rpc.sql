@@ -48,7 +48,7 @@ BEGIN
       p_date,
       p_time,
       p_duration,
-      ARRAY[p_creator_id]::text[],
+      jsonb_build_array(p_creator_id),
       0
     )
     RETURNING *;
@@ -57,7 +57,7 @@ $$;
 GRANT EXECUTE ON FUNCTION create_ritual(text,text,text,text,text,int,date,time,int) TO anon;
 
 -- ----------------------------------------------------------------------------
--- 2) join_ritual — append idempotente all'array participants
+-- 2) join_ritual — append idempotente all'array participants (jsonb)
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION join_ritual(
   p_ritual_id  bigint,
@@ -68,11 +68,11 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE rituals
-     SET participants = array_append(participants, p_session_id)
+     SET participants = participants || jsonb_build_array(p_session_id)
    WHERE id = p_ritual_id
      AND p_session_id IS NOT NULL
      AND p_session_id <> ''
-     AND NOT (p_session_id = ANY(participants));
+     AND NOT (participants @> jsonb_build_array(p_session_id));
 END;
 $$;
 GRANT EXECUTE ON FUNCTION join_ritual(bigint,text) TO anon;
