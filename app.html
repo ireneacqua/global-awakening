@@ -761,6 +761,10 @@
               resonance: "Resonance ✨",
               again: "Again",
               endSessionBtn: "End Session",
+              endSessionConfirmTitle: "Leave session?",
+              endSessionConfirmBody: "Your partner will be notified. This cannot be undone.",
+              endSessionConfirmYes: "Leave",
+              endSessionConfirmNo: "Stay",
               sessionComplete: "Session Complete!",
               roundsPlayed: "Rounds played",
               correctMatches: "Correct matches",
@@ -982,6 +986,10 @@
               resonance: "Sintonia ✨",
               again: "Ancora",
               endSessionBtn: "Termina Sessione",
+              endSessionConfirmTitle: "Uscire dalla sessione?",
+              endSessionConfirmBody: "Il tuo partner riceverà la notifica. Non si può tornare indietro.",
+              endSessionConfirmYes: "Esci",
+              endSessionConfirmNo: "Resta",
               sessionComplete: "Sessione Completata!",
               roundsPlayed: "Round giocati",
               correctMatches: "Match corretti",
@@ -1039,6 +1047,7 @@
           const [currentLevel, setCurrentLevel] = useState('shapes'); // 'shapes' | 'numbers' | 'words'
           const [roundCount, setRoundCount] = useState(0);
           const [sessionMatches, setSessionMatches] = useState(0);
+          const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false);
           // Ref aggiornata per leggere il valore corrente dentro pollResult
           // senza dover ricreare l'effect ad ogni round (e quindi perdere fino a 2s di polling).
           const sessionMatchesRef = React.useRef(0);
@@ -3443,7 +3452,30 @@
                     )}
 
                     {(partner || sessionEnded) && (
-                      <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start'}}>
+                      <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start', position: 'relative'}}>
+                        {partner && !sessionEnded && (
+                          <button
+                            onClick={() => setShowEndSessionConfirm(true)}
+                            aria-label={t.telepathy.endSessionBtn}
+                            title={t.telepathy.endSessionBtn}
+                            style={{
+                              position: 'absolute',
+                              top: '0.5rem',
+                              right: '0.5rem',
+                              width: '2rem',
+                              height: '2rem',
+                              borderRadius: '50%',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              background: 'rgba(0,0,0,0.45)',
+                              color: 'white',
+                              fontSize: '1rem',
+                              cursor: 'pointer',
+                              lineHeight: 1,
+                              padding: 0,
+                              zIndex: 5
+                            }}
+                          >✕</button>
+                        )}
                         {partnerDisconnected && (
                           <div style={{width: '100%', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'center', marginBottom: '0.5rem'}}>
                             <div style={{fontSize: '2rem', marginBottom: '0.4rem'}}>📡</div>
@@ -4029,6 +4061,30 @@
                     <div style={{display: 'flex', gap: '0.75rem'}}>
                       <button onClick={acceptInvite} className="btn-primary" style={{flex: 1}}>{t.telepathy.acceptBtn}</button>
                       <button onClick={declineInvite} className="btn-secondary" style={{flex: 1}}>{t.telepathy.declineBtn}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showEndSessionConfirm && (
+                <div className="modal-overlay" onClick={() => setShowEndSessionConfirm(false)}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                    <h3 className="text-white font-bold mb-2" style={{fontSize: '1.1rem'}}>
+                      {t.telepathy.endSessionConfirmTitle}
+                    </h3>
+                    <p className="text-secondary mb-4" style={{fontSize: '0.9rem'}}>
+                      {t.telepathy.endSessionConfirmBody}
+                    </p>
+                    <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'flex-end'}}>
+                      <button onClick={() => setShowEndSessionConfirm(false)} className="btn-secondary">
+                        {t.telepathy.endSessionConfirmNo}
+                      </button>
+                      <button
+                        onClick={() => { setShowEndSessionConfirm(false); endSession(); }}
+                        className="btn-primary"
+                      >
+                        {t.telepathy.endSessionConfirmYes}
+                      </button>
                     </div>
                   </div>
                 </div>

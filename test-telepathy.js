@@ -250,6 +250,41 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
     pass('TestUserB tornato in lobby dopo aver cliccato "Torna alla lobby"');
 
+    // ── Test 7b: X termina sessione DURANTE un round (prima del risultato) ──
+    console.log('\n📋 Test 7b: X termina durante round attivo');
+    // pageA è ancora su "Sessione Completata": prima riportala in lobby
+    try {
+      await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 5000 });
+    } catch { /* già in lobby */ }
+    await waitForLobby(pageA, 'TestUserA');
+    await clickFindPartner(pageA, 'TestUserA');
+    await pageA.waitForTimeout(500);
+    await clickFindPartner(pageB, 'TestUserB');
+    await Promise.all([
+      waitForPartnerFound(pageA, 'TestUserA'),
+      waitForPartnerFound(pageB, 'TestUserB'),
+    ]);
+    pass('Re-match per test 7b ok');
+
+    // Click X (senza inviare simboli) su pageA
+    const xBtnA = pageA.locator(`button[aria-label="Termina Sessione"], button[aria-label="End Session"]`).first();
+    await xBtnA.click();
+    await pageA.waitForSelector('text=/Uscire dalla sessione|Leave session/', { timeout: 5000 });
+    pass('Modale conferma apparso');
+
+    await pageA.locator('button:has-text("Esci"), button:has-text("Leave")').first().click();
+    await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
+    pass('TestUserA fuori sessione tramite X durante round attivo');
+
+    await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
+    pass('TestUserB notificato di uscita partner');
+
+    // Riporta TestUserA in lobby per i test successivi
+    try {
+      await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 5000 });
+    } catch { /* già in lobby */ }
+    await waitForLobby(pageA, 'TestUserA');
+
     // ── Test 8: Invito diretto ────────────────────────────────────────────
     console.log('\n📋 Test 8: Invito diretto (Proponi → Accetta)');
 
