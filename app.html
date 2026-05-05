@@ -1883,27 +1883,22 @@
               if (senderChoice && receiverChoice) {
                 if (senderChoice === receiverChoice && senderChoice !== 'continue') {
                   setCurrentLevel(senderChoice);
-                  setRoundCount(0);
                   setShowLevelBanner(false);
                   setMyLevelChoice(null);
                   await supabase.from('telepathy_matches').update({
                     level: senderChoice,
-                    round_count: 0,
                     level_change_choice_sender: null,
                     level_change_choice_receiver: null
                   }).eq('id', matchId);
                 } else {
-                  // Disaccordo — mostra messaggio e resetta round_count
                   const myChoice = role === 'sender' ? senderChoice : receiverChoice;
                   const theirChoice = role === 'sender' ? receiverChoice : senderChoice;
                   setLevelDisagreement({ myChoice, theirChoice });
                   setShowLevelBanner(false);
                   setMyLevelChoice(null);
-                  setRoundCount(0);
                   await supabase.from('telepathy_matches').update({
                     level_change_choice_sender: null,
-                    level_change_choice_receiver: null,
-                    round_count: 0
+                    level_change_choice_receiver: null
                   }).eq('id', matchId);
                 }
                 return;
@@ -1988,12 +1983,11 @@
               const receiverChoice = match.level_change_choice_receiver;
 
               if (!senderChoice || !receiverChoice) {
-                // Bug-fix B: race condition — se io avevo già scelto ma le choices sono
-                // state cancellate dall'altro utente (che ha processato per primo):
+                // Race: se io avevo già scelto ma le choices sono state cancellate
+                // dall'altro client (che ha processato per primo):
                 // 1) livello cambiato → sync + dismiss
                 if (match.level && match.level !== currentLevel) {
                   setCurrentLevel(match.level);
-                  setRoundCount(0);
                   lastProcessedRoundRef.current = -1;
                   setShowLevelBanner(false);
                   setMyLevelChoice(null);
@@ -2013,22 +2007,18 @@
 
               if (agreed) {
                 setCurrentLevel(newLevel);
-                setRoundCount(0);
-                // Bug-fix A: resetta il ref così i round successivi vengono processati
+                // Resetta il ref così i round successivi vengono processati
                 lastProcessedRoundRef.current = -1;
               }
               setShowLevelBanner(false);
               setMyLevelChoice(null);
               myLevelChoiceRef.current = null;
 
-              const updatePayload = {
+              await supabase.from('telepathy_matches').update({
                 level: newLevel,
                 level_change_choice_sender: null,
                 level_change_choice_receiver: null
-              };
-              if (agreed) updatePayload.round_count = 0;
-
-              await supabase.from('telepathy_matches').update(updatePayload).eq('id', matchId);
+              }).eq('id', matchId);
             };
 
             pollLevelChange();

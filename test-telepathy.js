@@ -497,6 +497,17 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       fail('Livello NON cambiato a Numeri');
     }
 
+    // ── Test 11b: roundCount sopravvive al cambio livello (#11) ─────────────
+    // Il counter Round nella card sx deve essere ancora 7 (non resettato a 0).
+    const roundLabelLocator = pageA.locator('span').filter({ hasText: /^(Round|Round)$/ }).first();
+    const roundValueLocator = roundLabelLocator.locator('xpath=following-sibling::span[1]');
+    const roundCountAfter = parseInt((await roundValueLocator.textContent()).trim(), 10);
+    if (roundCountAfter === 7) {
+      pass(`roundCount sopravvive al cambio livello (= ${roundCountAfter}) ✅`);
+    } else {
+      fail(`roundCount resettato dopo cambio livello: visto ${roundCountAfter}, atteso 7`);
+    }
+
   } catch (err) {
     fail(`Errore imprevisto: ${err.message}`);
     console.error(err);
