@@ -508,6 +508,74 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       fail(`roundCount resettato dopo cambio livello: visto ${roundCountAfter}, atteso 7`);
     }
 
+    // ── Test 12: Mismatch su cambio livello → disagreement (#6) ─────────────
+    console.log('\n📋 Test 12: Mismatch livello (RPC apply_level_change_if_both_agree)');
+
+    // Riporta entrambi in lobby
+    const xBtnEnd = pageA.locator(`button[aria-label="Termina Sessione"], button[aria-label="End Session"]`).first();
+    await xBtnEnd.click();
+    await pageA.locator('button:has-text("Esci"), button:has-text("Leave")').first().click();
+    await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
+    try {
+      await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 5000 });
+    } catch { /* già in lobby */ }
+    await waitForLobby(pageA, 'TestUserA');
+    await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
+
+    // Re-match
+    await clickFindPartner(pageA, 'TestUserA');
+    await pageA.waitForTimeout(500);
+    await clickFindPartner(pageB, 'TestUserB');
+    await Promise.all([
+      waitForPartnerFound(pageA, 'TestUserA'),
+      waitForPartnerFound(pageB, 'TestUserB'),
+    ]);
+
+    const roleA5 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
+    const isSenderA5 = roleA5.trim() === 'Sender' || roleA5.trim() === 'Mittente';
+    const sp5 = isSenderA5 ? pageA : pageB;
+    const rp5 = isSenderA5 ? pageB : pageA;
+    const sName5 = isSenderA5 ? 'TestUserA' : 'TestUserB';
+    const rName5 = isSenderA5 ? 'TestUserB' : 'TestUserA';
+
+    // Gioca 7 round per far apparire il banner cambio livello
+    for (let i = 1; i <= 7; i++) {
+      await sendSymbol(sp5, sName5);
+      await guessSymbol(rp5, rName5);
+      await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
+      await Promise.all([
+        pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
+        pageB.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
+      ]);
+      await pageA.waitForTimeout(5000);
+    }
+
+    await Promise.all([
+      pageA.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
+      pageB.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
+    ]);
+    pass('Banner cambio livello apparso (Test 12)');
+
+    // A clicca Numeri (1°), B clicca Parole (2° → vede mismatch via RPC)
+    await pageA.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click();
+    log('TestUserA', 'Scelta: Numeri');
+    await pageA.waitForTimeout(500); // assicura che la RPC di A sia processata prima
+    await pageB.locator('button').filter({ hasText: /^(💬 )?(Parole|Words)$/ }).first().click();
+    log('TestUserB', 'Scelta: Parole');
+
+    // B (che ha cliccato 2° e visto il mismatch) vede il banner di disaccordo
+    await pageB.waitForSelector('text=/Avete scelto livelli diversi|Different choices/i', { timeout: 10000 });
+    pass('B vede banner disagreement (RPC ha rilevato mismatch)');
+
+    // A: il banner cambio livello deve essere dismissed dal polling, livello invariato (Forme/Shapes)
+    await pageA.waitForTimeout(3000); // attendi 1 ciclo di polling
+    const livelloDopoMismatch = await pageA.locator('span.text-white.text-sm.font-bold').filter({ hasText: /^(Forme|Shapes|Numeri|Numbers|Parole|Words)$/ }).first().textContent();
+    if (/^(Forme|Shapes)$/.test(livelloDopoMismatch.trim())) {
+      pass(`A: livello invariato dopo mismatch (= ${livelloDopoMismatch.trim()}) ✅`);
+    } else {
+      fail(`A: livello cambiato a "${livelloDopoMismatch}", atteso Forme/Shapes`);
+    }
+
   } catch (err) {
     fail(`Errore imprevisto: ${err.message}`);
     console.error(err);

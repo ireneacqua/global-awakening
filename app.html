@@ -1852,8 +1852,32 @@
           const proposeLevelChange = async (choice) => {
             setMyLevelChoice(choice);
             myLevelChoiceRef.current = choice;
-            const field = role === 'sender' ? 'level_change_choice_sender' : 'level_change_choice_receiver';
-            await supabase.from('telepathy_matches').update({ [field]: choice }).eq('id', matchId);
+            const { data, error } = await supabase.rpc('apply_level_change_if_both_agree', {
+              p_match_id: matchId,
+              p_choice: choice,
+              p_role: role
+            });
+            if (error) {
+              console.warn('apply_level_change_if_both_agree failed', error);
+              return;
+            }
+            const result = Array.isArray(data) ? data[0] : data;
+            if (!result) return;
+            if (result.out_status === 'agreed') {
+              setCurrentLevel(result.out_new_level);
+              setShowLevelBanner(false);
+              setMyLevelChoice(null);
+              myLevelChoiceRef.current = null;
+              lastProcessedRoundRef.current = -1;
+            } else if (result.out_status === 'disagreement') {
+              const myChoice = role === 'sender' ? result.out_sender_choice : result.out_receiver_choice;
+              const theirChoice = role === 'sender' ? result.out_receiver_choice : result.out_sender_choice;
+              setLevelDisagreement({ myChoice, theirChoice });
+              setShowLevelBanner(false);
+              setMyLevelChoice(null);
+              myLevelChoiceRef.current = null;
+            }
+            // 'pending' → l'altro non ha ancora scelto, banner resta per chi ha già scelto.
           };
 
           // Poll for telepathy result when waiting
@@ -1872,36 +1896,22 @@
               }
               const match = data[0];
 
-              // Sincronizza livello dal match
+              // Sincronizza livello dal match (la RPC dell'altro client può aver cambiato level)
               if (match.level && match.level !== currentLevel) {
                 setCurrentLevel(match.level);
+                lastProcessedRoundRef.current = -1;
+                setShowLevelBanner(false);
+                setMyLevelChoice(null);
+                myLevelChoiceRef.current = null;
               }
 
-              // Gestisci proposta cambio livello (entrambi hanno scelto)
-              const senderChoice = match.level_change_choice_sender;
-              const receiverChoice = match.level_change_choice_receiver;
-              if (senderChoice && receiverChoice) {
-                if (senderChoice === receiverChoice && senderChoice !== 'continue') {
-                  setCurrentLevel(senderChoice);
-                  setShowLevelBanner(false);
-                  setMyLevelChoice(null);
-                  await supabase.from('telepathy_matches').update({
-                    level: senderChoice,
-                    level_change_choice_sender: null,
-                    level_change_choice_receiver: null
-                  }).eq('id', matchId);
-                } else {
-                  const myChoice = role === 'sender' ? senderChoice : receiverChoice;
-                  const theirChoice = role === 'sender' ? receiverChoice : senderChoice;
-                  setLevelDisagreement({ myChoice, theirChoice });
-                  setShowLevelBanner(false);
-                  setMyLevelChoice(null);
-                  await supabase.from('telepathy_matches').update({
-                    level_change_choice_sender: null,
-                    level_change_choice_receiver: null
-                  }).eq('id', matchId);
-                }
-                return;
+              // Se le choices sono state azzerate dalla RPC (consenso/disaccordo già processato)
+              // e avevo un banner aperto, dismiss
+              if (!match.level_change_choice_sender && !match.level_change_choice_receiver
+                  && myLevelChoiceRef.current !== null) {
+                setShowLevelBanner(false);
+                setMyLevelChoice(null);
+                myLevelChoiceRef.current = null;
               }
 
               // Risultato round — processa solo se è un round nuovo (round_count avanzato)
@@ -1976,49 +1986,30 @@
             if (!matchId || !showLevelBanner) return;
 
             const pollLevelChange = async () => {
+              // Read-only: tutta la scrittura del consenso passa dalla RPC apply_level_change_if_both_agree.
+              // Qui sincronizziamo solo lo stato UI dell'altro client.
               const { data } = await supabase.from('telepathy_matches').select('*').eq('id', matchId);
               if (!data || data.length === 0) return;
               const match = data[0];
-              const senderChoice = match.level_change_choice_sender;
-              const receiverChoice = match.level_change_choice_receiver;
 
-              if (!senderChoice || !receiverChoice) {
-                // Race: se io avevo già scelto ma le choices sono state cancellate
-                // dall'altro client (che ha processato per primo):
-                // 1) livello cambiato → sync + dismiss
-                if (match.level && match.level !== currentLevel) {
-                  setCurrentLevel(match.level);
-                  lastProcessedRoundRef.current = -1;
-                  setShowLevelBanner(false);
-                  setMyLevelChoice(null);
-                  myLevelChoiceRef.current = null;
-                }
-                // 2) livello invariato (disaccordo/continua) → se avevo già scelto, dismiss
-                else if (myLevelChoiceRef.current !== null) {
-                  setShowLevelBanner(false);
-                  setMyLevelChoice(null);
-                  myLevelChoiceRef.current = null;
-                }
+              // Caso 1: livello cambiato → la RPC dell'altro è andata a buon fine, sync e dismiss
+              if (match.level && match.level !== currentLevel) {
+                setCurrentLevel(match.level);
+                lastProcessedRoundRef.current = -1;
+                setShowLevelBanner(false);
+                setMyLevelChoice(null);
+                myLevelChoiceRef.current = null;
                 return;
               }
 
-              const agreed = senderChoice === receiverChoice && senderChoice !== 'continue';
-              const newLevel = agreed ? senderChoice : currentLevel;
-
-              if (agreed) {
-                setCurrentLevel(newLevel);
-                // Resetta il ref così i round successivi vengono processati
-                lastProcessedRoundRef.current = -1;
+              // Caso 2: choices azzerate (RPC ha processato disagreement o 'continue') → dismiss banner
+              if (!match.level_change_choice_sender
+                  && !match.level_change_choice_receiver
+                  && myLevelChoiceRef.current !== null) {
+                setShowLevelBanner(false);
+                setMyLevelChoice(null);
+                myLevelChoiceRef.current = null;
               }
-              setShowLevelBanner(false);
-              setMyLevelChoice(null);
-              myLevelChoiceRef.current = null;
-
-              await supabase.from('telepathy_matches').update({
-                level: newLevel,
-                level_change_choice_sender: null,
-                level_change_choice_receiver: null
-              }).eq('id', matchId);
             };
 
             pollLevelChange();
