@@ -26,6 +26,8 @@ const EMAIL_A = `msga_${TS}@test.com`;
 const NICK_B  = `MsgB_${TS}`;
 const EMAIL_B = `msgb_${TS}@test.com`;
 const PASS    = 'Password123!';
+const GUEST_A = `GMsgA_${TS}`;
+const GUEST_B = `GMsgB_${TS}`;
 
 let passed = 0;
 let failed = 0;
@@ -56,8 +58,12 @@ async function cleanup() {
   await sbFetch(`profiles?email=eq.${encodeURIComponent(EMAIL_B)}`, { method: 'DELETE' });
   await sbFetch(`private_messages?sender_name=eq.${encodeURIComponent(NICK_A)}`, { method: 'DELETE' });
   await sbFetch(`private_messages?sender_name=eq.${encodeURIComponent(NICK_B)}`, { method: 'DELETE' });
+  await sbFetch(`private_messages?sender_name=eq.${encodeURIComponent(GUEST_A)}`, { method: 'DELETE' });
+  await sbFetch(`private_messages?sender_name=eq.${encodeURIComponent(GUEST_B)}`, { method: 'DELETE' });
   await sbFetch(`online_users?nickname=eq.${encodeURIComponent(NICK_A)}`, { method: 'DELETE' });
   await sbFetch(`online_users?nickname=eq.${encodeURIComponent(NICK_B)}`, { method: 'DELETE' });
+  await sbFetch(`online_users?nickname=eq.${encodeURIComponent(GUEST_A)}`, { method: 'DELETE' });
+  await sbFetch(`online_users?nickname=eq.${encodeURIComponent(GUEST_B)}`, { method: 'DELETE' });
 }
 
 /** Registra un nuovo utente e aspetta il badge "Registered" */
@@ -274,6 +280,66 @@ async function closeModal(page) {
     } else {
       fail('Storico messaggi perso dopo logout/re-login');
     }
+
+    // ── Test 10: Messaggi privati tra DUE GUEST (no registrazione) ─────────
+    console.log('\n📋 Test 10: Messaggi privati guest-to-guest (#8/#2)');
+    // Nuovi context per due guest separati
+    const ctxGuestA = await browser.newContext();
+    const ctxGuestB = await browser.newContext();
+    const pageGA = await ctxGuestA.newPage();
+    const pageGB = await ctxGuestB.newPage();
+
+    async function loginGuest(p, nick) {
+      await p.goto(APP_URL);
+      await p.waitForSelector('button:has-text("Ospite"), button:has-text("Guest")', { timeout: TIMEOUT });
+      await p.locator('button:has-text("Ospite"), button:has-text("Guest")').first().click();
+      await p.locator('input[placeholder*="username"], input[placeholder*="Username"]').first().fill(nick);
+      await p.locator('button:has-text("Entra come Ospite"), button:has-text("Enter as Guest")').click();
+      await p.waitForSelector('button:has-text("Logout"), button:has-text("Esci")', { timeout: TIMEOUT });
+      log(nick, 'Login guest ok');
+    }
+
+    await Promise.all([loginGuest(pageGA, GUEST_A), loginGuest(pageGB, GUEST_B)]);
+
+    // Naviga a Coscienza dove c'è la community list
+    await Promise.all([
+      pageGA.locator('button').filter({ hasText: /Coscienza|Consciousness/ }).first().click(),
+      pageGB.locator('button').filter({ hasText: /Coscienza|Consciousness/ }).first().click(),
+    ]);
+    // Aspetta che il polling popoli online_users
+    await pageGA.waitForTimeout(11000);
+
+    // GuestA apre il profilo di GuestB (= profilo "empty" perché GuestB non ha riga in `profiles`)
+    await openProfileOf(pageGA, GUEST_B);
+    log(GUEST_A, `Aperto profilo di ${GUEST_B}`);
+
+    // Verifica che la sezione messaggi sia visibile (fix #2 → #8: presente anche per profili empty)
+    const inputBox = pageGA.locator('input[placeholder="Type a message..."]');
+    const inputVisible = await inputBox.count();
+    if (inputVisible > 0) {
+      pass('Sezione messaggi visibile anche per profilo guest senza riga in profiles');
+    } else {
+      fail('Sezione messaggi NON visibile per profilo guest — bug #2/#8 ancora presente');
+    }
+
+    // GuestA invia messaggio
+    const guestMsg = `Ciao ${GUEST_B}, sono guest!`;
+    await sendMessage(pageGA, guestMsg);
+    log(GUEST_A, `Messaggio inviato: "${guestMsg}"`);
+
+    // GuestB apre profilo GuestA e verifica di vedere il messaggio
+    await pageGB.waitForTimeout(2000);
+    await openProfileOf(pageGB, GUEST_A);
+    await pageGB.waitForTimeout(9000); // attendi un ciclo di polling 8s
+    const msgVisibleOnB = await pageGB.locator(`.modal-content :text("${guestMsg.substring(0, 20)}")`).count();
+    if (msgVisibleOnB > 0) {
+      pass('GuestB riceve il messaggio di GuestA (guest-to-guest funziona)');
+    } else {
+      fail('GuestB NON vede il messaggio di GuestA — bug #8 confermato');
+    }
+
+    await ctxGuestA.close();
+    await ctxGuestB.close();
 
   } catch (err) {
     fail(`Errore imprevisto: ${err.message}`);
