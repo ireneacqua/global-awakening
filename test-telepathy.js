@@ -576,6 +576,63 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       fail(`A: livello cambiato a "${livelloDopoMismatch}", atteso Forme/Shapes`);
     }
 
+    // ── Test 13: Indicatore "training in corso" cross-tab (Batch C #3) ──────
+    console.log('\n📋 Test 13: Indicatore training cross-tab (Batch C #3)');
+
+    // Premessa: A e B sono ancora in sessione (vengono dal Test 12, partner attivo, !sessionEnded)
+    // 13a: badge .training-badge presente nel bottone tab Telepatia di entrambi i client
+    const badgeA = await pageA.locator('.training-badge').count();
+    const badgeB = await pageB.locator('.training-badge').count();
+    if (badgeA > 0 && badgeB > 0) {
+      pass(`Test 13a: badge tab Telepatia visibile su entrambi i client (A=${badgeA}, B=${badgeB})`);
+    } else {
+      fail(`Test 13a: badge tab Telepatia non trovato (A=${badgeA}, B=${badgeB})`);
+    }
+
+    // 13b: cambio tab interno (A → Rituali) — il badge deve restare visibile
+    await pageA.locator('button').filter({ hasText: /^(Rituals|Rituali)$/ }).first().click();
+    await pageA.waitForTimeout(300);
+    const badgeA2 = await pageA.locator('.training-badge').count();
+    if (badgeA2 > 0) {
+      pass('Test 13b: badge tab Telepatia persiste anche su altro tab interno dell\'app');
+    } else {
+      fail('Test 13b: badge sparito dopo cambio tab interno');
+    }
+
+    // 13c: simula browser tab hidden su A → floating banner deve apparire
+    await pageA.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await pageA.waitForTimeout(400);
+    const bannerVisible = await pageA.locator('.training-floating-banner').isVisible().catch(() => false);
+    if (bannerVisible) {
+      pass('Test 13c: floating banner appare quando il tab del browser è hidden');
+    } else {
+      fail('Test 13c: floating banner non visibile a tab nascosto');
+    }
+
+    // 13d: click sul floating banner → setActiveTab('telepathy')
+    if (bannerVisible) {
+      await pageA.locator('.training-floating-banner').click();
+      await pageA.waitForTimeout(300);
+    }
+
+    // 13e: restore visibility → floating banner sparisce
+    await pageA.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await pageA.waitForTimeout(400);
+    const bannerStillVisible = await pageA.locator('.training-floating-banner').isVisible().catch(() => false);
+    if (!bannerStillVisible) {
+      pass('Test 13d: floating banner sparisce dopo restore visibility');
+    } else {
+      fail('Test 13d: floating banner ancora visibile dopo restore visibility');
+    }
+
   } catch (err) {
     fail(`Errore imprevisto: ${err.message}`);
     console.error(err);

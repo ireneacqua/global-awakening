@@ -150,6 +150,11 @@
             to   { transform: translateX(0);    opacity: 1; }
         }
 
+        @keyframes training-banner-slide-up {
+            from { transform: translateY(120%); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+
         @keyframes ripple {
             0% { transform: scale(0.8); opacity: 1; }
             100% { transform: scale(2.5); opacity: 0; }
@@ -791,7 +796,9 @@
               inviteModalBody: "wants to do telepathy training with you!",
               acceptBtn: "Accept",
               declineBtn: "Decline",
-              inviteExpired: "Expired"
+              inviteExpired: "Expired",
+              trainingFloatingPrefix: "Training in progress with",
+              trainingFloatingCta: "Return"
             }
           },
           it: {
@@ -1016,7 +1023,9 @@
               inviteModalBody: "ti vuole fare training telepatico!",
               acceptBtn: "Accetta",
               declineBtn: "Rifiuta",
-              inviteExpired: "Scaduto"
+              inviteExpired: "Scaduto",
+              trainingFloatingPrefix: "Training in corso con",
+              trainingFloatingCta: "Torna"
             }
           }
         };
@@ -1072,6 +1081,14 @@
           const [senderHasSent, setSenderHasSent] = useState(false);
           const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
           const [newTelepathyMessage, setNewTelepathyMessage] = useState('');
+          // Batch C #3 — tab nascosto (utente passato a altro tab del browser)
+          const [isTabHidden, setIsTabHidden] = useState(typeof document !== 'undefined' && document.hidden);
+
+          useEffect(() => {
+            const onVisChange = () => setIsTabHidden(document.hidden);
+            document.addEventListener('visibilitychange', onVisChange);
+            return () => document.removeEventListener('visibilitychange', onVisChange);
+          }, []);
 
           const getCurrentSymbols = (level) => {
             if (level === 'numbers') return telepathyNumbers;
@@ -3070,6 +3087,22 @@
                       style={{whiteSpace: 'nowrap', flex: '1', textAlign: 'center', fontSize: 'clamp(0.75rem, 2.5vw, 1rem)'}}
                     >
                       {t.tabs[tab]}
+                      {tab === 'telepathy' && partner && !sessionEnded && (
+                        <span
+                          className="training-badge pulse-glow"
+                          style={{
+                            display: 'inline-block',
+                            width: '8px',
+                            height: '8px',
+                            background: '#a78bfa',
+                            borderRadius: '50%',
+                            marginLeft: '0.4rem',
+                            boxShadow: '0 0 8px #a78bfa',
+                            verticalAlign: 'middle'
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -4070,6 +4103,32 @@
                     <button onClick={acceptInvite} className="btn-primary" style={{flex: 1, fontSize: '0.85rem', padding: '0.4rem 0.6rem'}}>{t.telepathy.acceptBtn}</button>
                     <button onClick={declineInvite} className="btn-secondary" style={{flex: 1, fontSize: '0.85rem', padding: '0.4rem 0.6rem'}}>{t.telepathy.declineBtn}</button>
                   </div>
+                </div>
+              )}
+
+              {partner && !sessionEnded && isTabHidden && (
+                <div
+                  className="training-floating-banner"
+                  onClick={() => setActiveTab('telepathy')}
+                  style={{
+                    position: 'fixed',
+                    bottom: '1rem',
+                    right: '1rem',
+                    maxWidth: 'min(320px, calc(100vw - 2rem))',
+                    background: 'linear-gradient(135deg, rgba(124,58,237,0.95) 0%, rgba(167,139,250,0.92) 100%)',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    boxShadow: '0 12px 40px rgba(124,58,237,0.5), 0 0 24px rgba(167,139,250,0.4)',
+                    borderRadius: '0.85rem',
+                    padding: '0.85rem 1rem',
+                    zIndex: 9998,
+                    cursor: 'pointer',
+                    animation: 'training-banner-slide-up 0.35s ease-out'
+                  }}
+                  title={t.telepathy.trainingFloatingCta}
+                >
+                  <p className="text-white" style={{margin: 0, fontSize: '0.9rem', lineHeight: 1.35}}>
+                    🔮 {t.telepathy.trainingFloatingPrefix} <strong>{partner.nickname}</strong> — {t.telepathy.trainingFloatingCta}
+                  </p>
                 </div>
               )}
 
