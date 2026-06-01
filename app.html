@@ -150,6 +150,11 @@
             to   { transform: translateX(0);    opacity: 1; }
         }
 
+        @keyframes training-banner-slide-up {
+            from { transform: translateY(120%); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+
         @keyframes ripple {
             0% { transform: scale(0.8); opacity: 1; }
             100% { transform: scale(2.5); opacity: 0; }
@@ -161,7 +166,7 @@
         .bg-glass-dark { background: rgba(255, 255, 255, 0.03); }
         .border-glass { border: 1px solid rgba(255, 255, 255, 0.1); }
         .text-primary { color: #a78bfa; }
-        .text-secondary { color: rgba(255, 255, 255, 0.55); }
+        .text-secondary { color: rgba(255, 255, 255, 0.62); }
 
         .btn-primary {
             background: #7c3aed;
@@ -264,9 +269,15 @@
             font-family: inherit;
             transition: border-color 0.2s;
         }
-        input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.35); }
+        input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.55); }
         input:focus, textarea:focus, select:focus { outline: none; border-color: rgba(167, 139, 250, 0.6); background: rgba(255,255,255,0.08); }
         select option { background: #0f0d1a; color: white; }
+
+        /* a11y (H4): anello di focus visibile per navigazione da tastiera (Tab).
+           Il mouse non lo mostra grazie a :focus-visible; solo il focus da tastiera lo attiva. */
+        :focus-visible { outline: 2px solid rgba(167, 139, 250, 0.95); outline-offset: 2px; border-radius: 4px; }
+        :focus:not(:focus-visible) { outline: none; }
+        input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid rgba(167, 139, 250, 0.9); outline-offset: 1px; }
         
         .fixed { position: fixed; }
         .sticky { position: sticky; }
@@ -698,7 +709,8 @@
               bestScore: "Match %",
               community: "Community",
               noProfile: "No profile yet",
-              close: "Close"
+              close: "Close",
+              notifications: "Notifications"
             },
             messages: {
               title: "Messages",
@@ -791,7 +803,9 @@
               inviteModalBody: "wants to do telepathy training with you!",
               acceptBtn: "Accept",
               declineBtn: "Decline",
-              inviteExpired: "Expired"
+              inviteExpired: "Expired",
+              trainingFloatingPrefix: "Training in progress with",
+              trainingFloatingCta: "Return"
             }
           },
           it: {
@@ -923,7 +937,8 @@
               bestScore: "% Match",
               community: "Comunita'",
               noProfile: "Nessun profilo ancora",
-              close: "Chiudi"
+              close: "Chiudi",
+              notifications: "Notifiche"
             },
             messages: {
               title: "Messaggi",
@@ -1016,7 +1031,9 @@
               inviteModalBody: "ti vuole fare training telepatico!",
               acceptBtn: "Accetta",
               declineBtn: "Rifiuta",
-              inviteExpired: "Scaduto"
+              inviteExpired: "Scaduto",
+              trainingFloatingPrefix: "Training in corso con",
+              trainingFloatingCta: "Torna"
             }
           }
         };
@@ -1072,6 +1089,14 @@
           const [senderHasSent, setSenderHasSent] = useState(false);
           const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
           const [newTelepathyMessage, setNewTelepathyMessage] = useState('');
+          // Batch C #3 — tab nascosto (utente passato a altro tab del browser)
+          const [isTabHidden, setIsTabHidden] = useState(typeof document !== 'undefined' && document.hidden);
+
+          useEffect(() => {
+            const onVisChange = () => setIsTabHidden(document.hidden);
+            document.addEventListener('visibilitychange', onVisChange);
+            return () => document.removeEventListener('visibilitychange', onVisChange);
+          }, []);
 
           const getCurrentSymbols = (level) => {
             if (level === 'numbers') return telepathyNumbers;
@@ -1164,6 +1189,25 @@
             const stored = localStorage.getItem('ga_show_telepathy');
             return stored !== null ? stored === 'true' : true;
           });
+
+          // a11y (H6): l'attributo lang dell'<html> segue la lingua scelta (screen reader + pronuncia corretta).
+          useEffect(() => {
+            if (typeof document !== 'undefined') document.documentElement.lang = lang;
+          }, [lang]);
+
+          // a11y (H3): Esc chiude il modale aperto (priorità all'overlay più "in alto").
+          useEffect(() => {
+            const onKeyDown = (e) => {
+              if (e.key !== 'Escape') return;
+              if (showEndSessionConfirm) { setShowEndSessionConfirm(false); return; }
+              if (showCreateRitual) { setShowCreateRitual(false); return; }
+              if (showEditProfile) { setShowEditProfile(false); return; }
+              if (viewingProfile) { setViewingProfile(null); return; }
+              if (showNotifPanel) { setShowNotifPanel(false); return; }
+            };
+            document.addEventListener('keydown', onKeyDown);
+            return () => document.removeEventListener('keydown', onKeyDown);
+          }, [showEndSessionConfirm, showCreateRitual, showEditProfile, viewingProfile, showNotifPanel]);
 
           // Pulizia stato remoto alla chiusura del tab.
           // sendBeacon non supporta DELETE: usiamo fetch con keepalive=true che il browser
@@ -2757,6 +2801,7 @@
                           value={tempNickname}
                           onChange={(e) => { setTempNickname(e.target.value); setLoginError(''); }}
                           placeholder={t.usernamePlaceholder}
+                          aria-label={t.usernamePlaceholder}
                         />
                         <button onClick={handleEnterGuest} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}}>
                           {t.enterAsGuest}
@@ -2772,12 +2817,14 @@
                           value={tempEmail}
                           onChange={(e) => { setTempEmail(e.target.value); setLoginError(''); }}
                           placeholder={t.emailPlaceholder}
+                          aria-label={t.emailPlaceholder}
                         />
                         <input
                           type="password"
                           value={tempPassword}
                           onChange={(e) => { setTempPassword(e.target.value); setLoginError(''); }}
                           placeholder="Password"
+                          aria-label="Password"
                         />
                         <button onClick={handleLogin} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempEmail.trim() || !tempPassword.trim()}>
                           {t.login}
@@ -2807,6 +2854,7 @@
                               value={magicLinkEmail}
                               onChange={(e) => { setMagicLinkEmail(e.target.value); setLoginError(''); }}
                               placeholder={t.emailPlaceholder}
+                              aria-label={t.emailPlaceholder}
                             />
                             <button onClick={handleSendMagicLink} className="btn-primary" style={{width: '100%'}} disabled={!magicLinkEmail.trim()}>
                               {t.sendMagicLink}
@@ -2826,6 +2874,7 @@
                           value={resetEmail}
                           onChange={(e) => { setResetEmail(e.target.value); setLoginError(''); }}
                           placeholder={t.emailPlaceholder}
+                          aria-label={t.emailPlaceholder}
                         />
                         <button onClick={handleSendResetEmail} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim()}>
                           {t.resetPassword}
@@ -2848,12 +2897,14 @@
                           value={resetNewPassword}
                           onChange={(e) => { setResetNewPassword(e.target.value); setLoginError(''); }}
                           placeholder={t.newPasswordPlaceholder}
+                          aria-label={t.newPasswordPlaceholder}
                         />
                         <input
                           type="password"
                           value={resetConfirmPassword}
                           onChange={(e) => { setResetConfirmPassword(e.target.value); setLoginError(''); }}
                           placeholder={t.confirmPasswordPlaceholder}
+                          aria-label={t.confirmPasswordPlaceholder}
                         />
                         <button onClick={handleSetNewPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetNewPassword.trim() || !resetConfirmPassword.trim()}>
                           {t.setNewPassword}
@@ -2869,18 +2920,21 @@
                           value={tempNickname}
                           onChange={(e) => { setTempNickname(e.target.value); setLoginError(''); }}
                           placeholder={t.usernamePlaceholder}
+                          aria-label={t.usernamePlaceholder}
                         />
                         <input
                           type="email"
                           value={tempEmail}
                           onChange={(e) => { setTempEmail(e.target.value); setLoginError(''); }}
                           placeholder={t.emailPlaceholder}
+                          aria-label={t.emailPlaceholder}
                         />
                         <input
                           type="password"
                           value={tempPassword}
                           onChange={(e) => { setTempPassword(e.target.value); setLoginError(''); }}
                           placeholder="Password"
+                          aria-label="Password"
                         />
                         <button onClick={handleRegister} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempNickname.trim() || !tempEmail.trim() || !tempPassword.trim()}>
                           {t.register}
@@ -2955,6 +3009,7 @@
                           onClick={() => setShowNotifPanel(p => !p)}
                           className="btn-secondary px-3 py-2"
                           style={{fontSize: '0.8rem', position: 'relative'}}
+                          aria-label={t.social.notifications}
                         >
                           🔔{notifItems.length > 0 && (
                             <span style={{
@@ -3070,6 +3125,22 @@
                       style={{whiteSpace: 'nowrap', flex: '1', textAlign: 'center', fontSize: 'clamp(0.75rem, 2.5vw, 1rem)'}}
                     >
                       {t.tabs[tab]}
+                      {tab === 'telepathy' && partner && !sessionEnded && (
+                        <span
+                          className="training-badge pulse-glow"
+                          style={{
+                            display: 'inline-block',
+                            width: '8px',
+                            height: '8px',
+                            background: '#a78bfa',
+                            borderRadius: '50%',
+                            marginLeft: '0.4rem',
+                            boxShadow: '0 0 8px #a78bfa',
+                            verticalAlign: 'middle'
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -3227,6 +3298,7 @@
                           value={newPostContent}
                           onChange={(e) => setNewPostContent(e.target.value)}
                           placeholder={t.feed.newPostPlaceholder}
+                          aria-label={t.feed.newPostPlaceholder}
                           rows={3}
                           style={{width: '100%', resize: 'vertical', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', padding: '0.75rem', fontSize: '0.95rem'}}
                           onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) createPost(); }}
@@ -3300,6 +3372,7 @@
                                     onChange={(e) => setNewCommentContents(prev => ({ ...prev, [post.id]: e.target.value }))}
                                     onKeyPress={(e) => e.key === 'Enter' && createComment(post.id)}
                                     placeholder={t.feed.addComment}
+                                    aria-label={t.feed.addComment}
                                     style={{flex: 1, fontSize: '0.875rem'}}
                                   />
                                   <button onClick={() => createComment(post.id)} className="btn-primary px-4 py-2" style={{fontSize: '0.85rem'}}>
@@ -3670,9 +3743,10 @@
                                   onChange={e => setNewTelepathyMessage(e.target.value)}
                                   onKeyDown={e => e.key === 'Enter' && sendTelepathyMessage()}
                                   placeholder={t.telepathy.chatPlaceholder}
+                                  aria-label={t.telepathy.chatPlaceholder}
                                   style={{flex: 1, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '0.5rem', padding: '0.3rem 0.5rem', color: 'white', fontSize: '0.8rem', outline: 'none'}}
                                 />
-                                <button onClick={sendTelepathyMessage} style={{background: 'rgba(139,92,246,0.5)', border: 'none', borderRadius: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', color: 'white', fontSize: '0.85rem'}}>➤</button>
+                                <button onClick={sendTelepathyMessage} aria-label={t.messages.send} style={{background: 'rgba(139,92,246,0.5)', border: 'none', borderRadius: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', color: 'white', fontSize: '0.85rem'}}>➤</button>
                               </div>
                             </div>
                           </div>
@@ -3689,7 +3763,7 @@
               {showEditProfile && (
                 <div className="modal-overlay" onClick={() => setShowEditProfile(false)}>
                   <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setShowEditProfile(false)} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
+                    <button onClick={() => setShowEditProfile(false)} aria-label={t.social.close} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
                     <div className="text-center mb-6">
                       <div style={{fontSize: '3rem'}} className="mb-2">{profile.avatar || '👤'}</div>
                       <h2 className="text-2xl font-bold text-white mb-2">{t.editProfile}</h2>
@@ -3897,7 +3971,7 @@
               {viewingProfile && (
                 <div className="modal-overlay" onClick={() => setViewingProfile(null)}>
                   <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setViewingProfile(null)} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
+                    <button onClick={() => setViewingProfile(null)} aria-label={t.social.close} style={{position:'absolute',top:'1rem',right:'1rem',background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',width:'2rem',height:'2rem',cursor:'pointer',color:'#fff',fontSize:'1.1rem',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
                     <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
                       {viewingProfile.empty ? (
                         <div className="text-center py-4">
@@ -4009,6 +4083,7 @@
                                     }
                                   }}
                                   placeholder={t.messages.placeholder}
+                                  aria-label={t.messages.placeholder}
                                   style={{flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem'}}
                                 />
                                 <button
@@ -4021,6 +4096,7 @@
                                   }}
                                   className="btn-primary"
                                   style={{padding: '0.5rem 1rem'}}
+                                  aria-label={t.messages.send}
                                 >
                                   <Send style={{width: '1rem', height: '1rem'}} />
                                 </button>
@@ -4070,6 +4146,32 @@
                     <button onClick={acceptInvite} className="btn-primary" style={{flex: 1, fontSize: '0.85rem', padding: '0.4rem 0.6rem'}}>{t.telepathy.acceptBtn}</button>
                     <button onClick={declineInvite} className="btn-secondary" style={{flex: 1, fontSize: '0.85rem', padding: '0.4rem 0.6rem'}}>{t.telepathy.declineBtn}</button>
                   </div>
+                </div>
+              )}
+
+              {partner && !sessionEnded && isTabHidden && (
+                <div
+                  className="training-floating-banner"
+                  onClick={() => setActiveTab('telepathy')}
+                  style={{
+                    position: 'fixed',
+                    bottom: '1rem',
+                    right: '1rem',
+                    maxWidth: 'min(320px, calc(100vw - 2rem))',
+                    background: 'linear-gradient(135deg, rgba(124,58,237,0.95) 0%, rgba(167,139,250,0.92) 100%)',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    boxShadow: '0 12px 40px rgba(124,58,237,0.5), 0 0 24px rgba(167,139,250,0.4)',
+                    borderRadius: '0.85rem',
+                    padding: '0.85rem 1rem',
+                    zIndex: 9998,
+                    cursor: 'pointer',
+                    animation: 'training-banner-slide-up 0.35s ease-out'
+                  }}
+                  title={t.telepathy.trainingFloatingCta}
+                >
+                  <p className="text-white" style={{margin: 0, fontSize: '0.9rem', lineHeight: 1.35}}>
+                    🔮 {t.telepathy.trainingFloatingPrefix} <strong>{partner.nickname}</strong> — {t.telepathy.trainingFloatingCta}
+                  </p>
                 </div>
               )}
 
