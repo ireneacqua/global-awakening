@@ -2844,7 +2844,7 @@
             <footer className="app-footer text-secondary">
               <span>Global Awakening · {new Date().getFullYear()}</span>
               <span style={{margin: '0 0.4rem'}}>·</span>
-              <button onClick={() => setShowPrivacy(true)} aria-label={t.privacy.linkLabel}>
+              <button onClick={() => setShowPrivacy(true)}>
                 {t.privacy.linkLabel}
               </button>
             </footer>
@@ -2871,7 +2871,7 @@
 
           if (showNicknamePrompt) {
             return (
-              <div className="min-h-screen bg-gradient flex items-center justify-center p-4">
+              <div className="min-h-screen bg-gradient flex items-center justify-center p-4" style={{paddingBottom: '3.5rem'}}>
                 <div className="absolute top-4 right-4">
                   <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary">
                     {lang === 'en' ? '🌐 EN' : '🌐 IT'}
@@ -3088,7 +3088,7 @@
           }
 
           return (
-            <div className="min-h-screen bg-gradient">
+            <div className="min-h-screen bg-gradient" style={{paddingBottom: '3.5rem'}}>
               <header className="sticky top-0 bg-glass border-b z-50">
                 <div className="container">
                   <div className="header-inner flex items-center justify-between py-3">
