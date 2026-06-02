@@ -1750,7 +1750,14 @@
               return;
             }
 
-            const hash = await hashPassword(pw);
+            let hash;
+            try {
+              hash = await hashPassword(pw);
+            } catch (e) {
+              setLoginError(t.connectionError);
+              setAuthLoading(false);
+              return;
+            }
             setPasswordHash(hash);
             const newSid = Date.now() + '-' + Math.random();
             setSessionId(newSid);
