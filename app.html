@@ -292,7 +292,20 @@
         .left-0 { left: 0; }
         .bottom-0 { bottom: 0; }
         .z-50 { z-index: 50; }
-        
+        .app-footer {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            text-align: center; padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            background: rgba(12, 15, 20, 0.85);
+            backdrop-filter: blur(4px);
+            z-index: 40;
+        }
+        .app-footer button {
+            background: none; border: none; color: #a78bfa;
+            cursor: pointer; text-decoration: underline;
+            font-size: 0.8rem; min-height: 40px; padding: 0 0.5rem;
+        }
+
         .overflow-y-auto { overflow-y: auto; }
         .flex-1 { flex: 1; }
         .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
@@ -733,6 +746,22 @@
               roundsPlayed: "Rounds Played",
               onlineNow: "Online Now"
             },
+            privacy: {
+              linkLabel: "Privacy",
+              title: "Privacy Policy",
+              lastUpdated: "Last updated: June 2026",
+              intro: "Global Awakening is a personal, non-commercial project. This page explains, in plain language, what data we handle and why.",
+              sections: [
+                { heading: "What we collect", body: "When you create an account: your email, a password (stored only as a cryptographic hash, never in plain text), and the nickname, short bio and country you choose to share. As you use the app we store your activity: telepathy scores, private messages, rituals, posts and comments, and your online status. Your browser also keeps your nickname and preferences in local storage. We do not use cookies, analytics or any external trackers." },
+                { heading: "Why we use it", body: "Only to make the app work: signing you in, powering the telepathy, rituals and community features, and showing in-app notifications. We never sell your data or use it for advertising." },
+                { heading: "Where it lives", body: "Your data is stored on Supabase (our database). Transactional emails (password reset and magic link) are sent through EmailJS. The site is hosted on GitHub Pages. We share data with these providers only as needed to run the service." },
+                { heading: "How long we keep it", body: "Account and activity data are kept while your account is active. Password-reset and magic-link tokens expire within 15 minutes." },
+                { heading: "Your rights", body: "Under the GDPR you can ask to access, correct, delete or export your data, or object to its use. To exercise any of these, open an issue on our public GitHub repository (github.com/ireneacqua/global-awakening). Please note: deletion and export are currently handled manually on request, as they are not yet automated in the app." },
+                { heading: "Security", body: "Data is stored on Supabase and passwords are kept hashed, never in plain text. As a small personal project we cannot guarantee enterprise-grade security — please don't share anything you wouldn't want others to potentially see." },
+                { heading: "Changes", body: "The version shown here is always the current one. If anything important changes, we'll update this page." }
+              ],
+              close: "Close"
+            },
             messages: {
               title: "Messages",
               subtitle: "Private conversations",
@@ -971,6 +1000,22 @@
               roundsPlayed: "Round Giocati",
               onlineNow: "Online Ora"
             },
+            privacy: {
+              linkLabel: "Privacy",
+              title: "Informativa sulla privacy",
+              lastUpdated: "Ultimo aggiornamento: giugno 2026",
+              intro: "Global Awakening è un progetto personale e non commerciale. Questa pagina spiega, in parole semplici, quali dati trattiamo e perché.",
+              sections: [
+                { heading: "Quali dati raccogliamo", body: "Quando crei un account: la tua email, una password (memorizzata solo come hash crittografico, mai in chiaro) e il nickname, la breve bio e il paese che scegli di condividere. Mentre usi l'app salviamo la tua attività: punteggi della telepatia, messaggi privati, rituali, post e commenti, e il tuo stato online. Il browser conserva inoltre nickname e preferenze nel local storage. Non usiamo cookie, analytics né tracker esterni." },
+                { heading: "Perché li usiamo", body: "Solo per far funzionare l'app: accesso, funzionalità di telepatia, rituali e community, e notifiche all'interno dell'app. Non vendiamo mai i tuoi dati né li usiamo per pubblicità." },
+                { heading: "Dove sono conservati", body: "I tuoi dati sono conservati su Supabase (il nostro database). Le email transazionali (reset password e magic link) vengono inviate tramite EmailJS. Il sito è ospitato su GitHub Pages. Condividiamo i dati con questi fornitori solo per quanto necessario a far funzionare il servizio." },
+                { heading: "Per quanto tempo li conserviamo", body: "I dati dell'account e di attività restano finché il tuo account è attivo. I token di reset password e magic link scadono entro 15 minuti." },
+                { heading: "I tuoi diritti", body: "In base al GDPR puoi chiedere di accedere, rettificare, cancellare o esportare i tuoi dati, oppure opporti al loro utilizzo. Per esercitarli, apri una issue sul nostro repository GitHub pubblico (github.com/ireneacqua/global-awakening). Nota: cancellazione ed export sono attualmente gestiti manualmente su richiesta, perché non ancora automatizzati nell'app." },
+                { heading: "Sicurezza", body: "I dati sono conservati su Supabase e le password sono salvate sotto forma di hash, mai in chiaro. Trattandosi di un piccolo progetto personale non possiamo garantire una sicurezza di livello aziendale: ti invitiamo a non condividere nulla che non vorresti potesse essere visto da altri." },
+                { heading: "Modifiche", body: "La versione mostrata qui è sempre quella attuale. Se qualcosa di importante cambia, aggiorneremo questa pagina." }
+              ],
+              close: "Chiudi"
+            },
             messages: {
               title: "Messaggi",
               subtitle: "Conversazioni private",
@@ -1102,6 +1147,7 @@
           const [sessionMatches, setSessionMatches] = useState(0);
           const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false);
           const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+          const [showPrivacy, setShowPrivacy] = useState(false);
           // Ref aggiornata per leggere il valore corrente dentro pollResult
           // senza dover ricreare l'effect ad ogni round (e quindi perdere fino a 2s di polling).
           const sessionMatchesRef = React.useRef(0);
@@ -1231,6 +1277,7 @@
           useEffect(() => {
             const onKeyDown = (e) => {
               if (e.key !== 'Escape') return;
+              if (showPrivacy) { setShowPrivacy(false); return; }
               if (showLogoutConfirm) { setShowLogoutConfirm(false); return; }
               if (showEndSessionConfirm) { setShowEndSessionConfirm(false); return; }
               if (showCreateRitual) { setShowCreateRitual(false); return; }
@@ -1240,7 +1287,7 @@
             };
             document.addEventListener('keydown', onKeyDown);
             return () => document.removeEventListener('keydown', onKeyDown);
-          }, [showLogoutConfirm, showEndSessionConfirm, showCreateRitual, showEditProfile, viewingProfile, showNotifPanel]);
+          }, [showPrivacy, showLogoutConfirm, showEndSessionConfirm, showCreateRitual, showEditProfile, viewingProfile, showNotifPanel]);
 
           // Pulizia stato remoto alla chiusura del tab.
           // sendBeacon non supporta DELETE: usiamo fetch con keepalive=true che il browser
@@ -2793,9 +2840,38 @@
             }
           };
 
+          const renderFooter = () => (
+            <footer className="app-footer text-secondary">
+              <span>Global Awakening · {new Date().getFullYear()}</span>
+              <span style={{margin: '0 0.4rem'}}>·</span>
+              <button onClick={() => setShowPrivacy(true)}>
+                {t.privacy.linkLabel}
+              </button>
+            </footer>
+          );
+
+          const renderPrivacyModal = () => showPrivacy && (
+            <div className="modal-overlay" onClick={() => setShowPrivacy(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '560px', maxHeight: '80vh', overflowY: 'auto'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem'}}>
+                  <h2 className="text-white font-bold" style={{fontSize: '1.3rem'}}>{t.privacy.title}</h2>
+                  <button onClick={() => setShowPrivacy(false)} aria-label={t.privacy.close} className="btn-secondary" style={{minWidth: '40px', minHeight: '40px', padding: '0.25rem 0.6rem'}}>✕</button>
+                </div>
+                <p className="text-secondary" style={{fontSize: '0.8rem', marginBottom: '1rem'}}>{t.privacy.lastUpdated}</p>
+                <p className="text-secondary" style={{fontSize: '0.9rem', marginBottom: '1rem'}}>{t.privacy.intro}</p>
+                {t.privacy.sections.map((s, i) => (
+                  <div key={i} style={{marginBottom: '1rem'}}>
+                    <h3 className="text-white font-bold mb-2" style={{fontSize: '1rem'}}>{s.heading}</h3>
+                    <p className="text-secondary" style={{fontSize: '0.9rem', lineHeight: '1.5'}}>{s.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+
           if (showNicknamePrompt) {
             return (
-              <div className="min-h-screen bg-gradient flex items-center justify-center p-4">
+              <div className="min-h-screen bg-gradient flex items-center justify-center p-4" style={{paddingBottom: '3.5rem'}}>
                 <div className="absolute top-4 right-4">
                   <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary">
                     {lang === 'en' ? '🌐 EN' : '🌐 IT'}
@@ -3005,12 +3081,14 @@
                     )}
                   </div>
                 </div>
+              {renderFooter()}
+              {renderPrivacyModal()}
               </div>
             );
           }
 
           return (
-            <div className="min-h-screen bg-gradient">
+            <div className="min-h-screen bg-gradient" style={{paddingBottom: '3.5rem'}}>
               <header className="sticky top-0 bg-glass border-b z-50">
                 <div className="container">
                   <div className="header-inner flex items-center justify-between py-3">
@@ -4360,6 +4438,8 @@
                   </div>
                 </div>
               )}
+              {renderFooter()}
+              {renderPrivacyModal()}
             </div>
           );
         }
