@@ -54,6 +54,38 @@ async function cleanupProfile(email) {
   await sbFetch(`profiles?email=eq.${encodeURIComponent(email)}`, { method: 'DELETE' });
 }
 
+// Test: guasto di rete sul login → messaggio di connessione, NON "nessun account"
+async function testNetworkErrorOnLogin() {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  let ok = true;
+  const failLocal = (m) => { console.log('  ✗ ' + m); ok = false; };
+  const passLocal = (m) => console.log('  ✓ ' + m);
+  try {
+    await page.goto('http://localhost:4321/app', { waitUntil: 'networkidle' });
+    await page.locator('button', { hasText: /^Login$|^Accedi$/ }).first().click().catch(() => {});
+    await page.route('**/rest/v1/**', route => route.abort());
+    await page.locator('input[type=email]').first().fill('chiunque@test.com');
+    await page.locator('input[type=password]').first().fill('qualsiasi');
+    // NB: il submit è il button.btn-primary; senza il filtro .btn-primary
+    // il regex /^Login$/ matcherebbe anche il TAB "Login" (primo nel DOM)
+    // e il click non invocherebbe handleLogin.
+    await page.locator('button.btn-primary', { hasText: /^Login$|^Accedi$/ }).first().click();
+    const errBox = page.locator('text=/Problema di connessione|Connection problem/');
+    await errBox.waitFor({ state: 'visible', timeout: 6000 });
+    passLocal('Mostra messaggio di connessione su guasto di rete');
+    const wrongMsg = await page.locator('text=/Nessun account|No account found/').count();
+    if (wrongMsg === 0) passLocal('NON mostra "nessun account" su guasto di rete');
+    else failLocal('Mostra ancora "nessun account" su guasto di rete');
+    await page.unroute('**/rest/v1/**');
+  } catch (e) {
+    failLocal('Eccezione: ' + e.message);
+  } finally {
+    await browser.close();
+  }
+  return ok;
+}
+
 /** Apre l'app e porta la schermata di auth alla tab indicata ('register'|'login') */
 async function openAuthTab(page, tab) {
   await page.goto(APP_URL);
@@ -192,6 +224,15 @@ async function openAuthTab(page, tab) {
     // Pulizia profilo test da Supabase
     await cleanupProfile(TEST_EMAIL);
     console.log(`\n  (Profilo test rimosso da Supabase)`);
+
+    // ── Test 10: Guasto di rete sul login → messaggio di connessione ─────
+    console.log('\n📋 Test 10: Guasto di rete sul login (browser indipendente)');
+    const netOk = await testNetworkErrorOnLogin();
+    if (netOk) {
+      pass('Guasto di rete → messaggio di connessione, non "nessun account"');
+    } else {
+      fail('Guasto di rete NON gestito correttamente');
+    }
 
     console.log('\n═══════════════════════════════════════');
     const totale = passed + failed;

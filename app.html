@@ -620,6 +620,7 @@
             usernameAlreadyUsed: "This username is already taken",
             fillAllFields: "Please fill in all fields",
             invalidEmail: "Please enter a valid email address",
+            connectionError: "Connection problem. Check your network and try again.",
             setPassword: "Set Password",
             changePassword: "Change Password",
             passwordSet: "Password set!",
@@ -874,6 +875,7 @@
             usernameAlreadyUsed: "Questo username e' gia' in uso",
             fillAllFields: "Compila tutti i campi",
             invalidEmail: "Inserisci un indirizzo email valido",
+            connectionError: "Problema di connessione. Controlla la rete e riprova.",
             setPassword: "Imposta Password",
             changePassword: "Cambia Password",
             passwordSet: "Password impostata!",
@@ -1221,6 +1223,7 @@
           const [tempEmail, setTempEmail] = useState('');
           const [passwordHash, setPasswordHash] = useState(null);
           const [loginError, setLoginError] = useState('');
+          const [authLoading, setAuthLoading] = useState(false);
           const [loginSuccess, setLoginSuccess] = useState('');
           const [profilePassword, setProfilePassword] = useState('');
           const [profilePasswordMsg, setProfilePasswordMsg] = useState('');
@@ -1646,16 +1649,23 @@
             const hash = await hashPassword(pw);
 
             // Search profile by email
-            const { data } = await supabase.from('profiles').select('*').eq('email', email);
-
+            setAuthLoading(true);
+            const { data, error } = await supabase.from('profiles').select('*').eq('email', email);
+            if (error) {
+              setLoginError(t.connectionError);
+              setAuthLoading(false);
+              return;
+            }
             if (!data || data.length === 0) {
               setLoginError(t.emailNotFound);
+              setAuthLoading(false);
               return;
             }
 
             const existing = data[0];
             if (existing.password_hash && existing.password_hash !== hash) {
               setLoginError(t.wrongPassword);
+              setAuthLoading(false);
               return;
             }
 
@@ -1698,6 +1708,7 @@
                 }).eq('email', email);
               }
             }
+            setAuthLoading(false);
           };
 
           const handleRegister = async () => {
@@ -1715,26 +1726,38 @@
 
             setLoginError('');
             setLoginSuccess('');
+            setAuthLoading(true);
 
             // Cattura il sid guest prima della sovrascrittura, per fondere i dati telepatia
             const prevGuestSid = sessionId;
             const wasGuest = !userEmail;
 
             // Check if email already exists
-            const { data: emailCheck } = await supabase.from('profiles').select('*').eq('email', email);
+            const { data: emailCheck, error: emailErr } = await supabase.from('profiles').select('*').eq('email', email);
+            if (emailErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
             if (emailCheck && emailCheck.length > 0) {
               setLoginError(t.emailAlreadyUsed);
+              setAuthLoading(false);
               return;
             }
 
             // Check if nickname already exists
-            const { data: nickCheck } = await supabase.from('profiles').select('*').eq('nickname', name);
+            const { data: nickCheck, error: nickErr } = await supabase.from('profiles').select('*').eq('nickname', name);
+            if (nickErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
             if (nickCheck && nickCheck.length > 0) {
               setLoginError(t.usernameAlreadyUsed);
+              setAuthLoading(false);
               return;
             }
 
-            const hash = await hashPassword(pw);
+            let hash;
+            try {
+              hash = await hashPassword(pw);
+            } catch (e) {
+              setLoginError(t.connectionError);
+              setAuthLoading(false);
+              return;
+            }
             setPasswordHash(hash);
             const newSid = Date.now() + '-' + Math.random();
             setSessionId(newSid);
@@ -1758,6 +1781,7 @@
 
             if (insertError) {
               setLoginError(t.registrationError || 'Registration failed. Please try again.');
+              setAuthLoading(false);
               return;
             }
 
@@ -1784,6 +1808,7 @@
                 }).eq('email', email);
               }
             }
+            setAuthLoading(false);
           };
 
           const handleSendResetEmail = async () => {
@@ -1792,18 +1817,22 @@
             if (!isValidEmail(email)) { setLoginError(t.invalidEmail); return; }
             setLoginError('');
             setLoginSuccess('');
+            setAuthLoading(true);
             try {
               const token = crypto.randomUUID();
               const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
               await supabase.from('password_resets').delete().eq('email', email);
-              await supabase.from('password_resets').insert({ email, token, expires_at: expiresAt });
+              const { error: insErr } = await supabase.from('password_resets').insert({ email, token, expires_at: expiresAt });
+              if (insErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
               const appUrl = window.location.origin + window.location.pathname;
               const resetUrl = `${appUrl}?reset=${token}`;
               await emailjs.send('service_rk97p6m', 'template_i5i06pl', { to_email: email, reset_url: resetUrl });
               setLoginSuccess(t.resetEmailSent);
               setResetEmail('');
             } catch (err) {
-              setLoginError('Errore invio email. Riprova.');
+              setLoginError(t.connectionError);
+            } finally {
+              setAuthLoading(false);
             }
           };
 
@@ -1815,14 +1844,17 @@
             setLoginError('');
             setLoginSuccess('');
             try {
+              setAuthLoading(true);
               const { data: rows, error: selErr } = await supabase
                 .from('password_resets')
                 .select('email, expires_at')
                 .eq('token', resetToken);
+              if (selErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
               const row = rows && rows[0];
-              if (selErr || !row || new Date(row.expires_at) < new Date()) {
+              if (!row || new Date(row.expires_at) < new Date()) {
                 setLoginError(t.resetTokenInvalid);
                 setResetToken('');
+                setAuthLoading(false);
                 return;
               }
               const hash = await hashPassword(pw);
@@ -1831,11 +1863,13 @@
                 .update({ password_hash: hash })
                 .eq('email', row.email);
               if (updErr) {
-                setLoginError('Errore aggiornamento password: ' + (updErr.message || updErr.code || JSON.stringify(updErr)));
+                setLoginError(t.connectionError);
+                setAuthLoading(false);
                 return;
               }
               if (!updData || updData.length === 0) {
                 setLoginError('Nessun account trovato per questa email.');
+                setAuthLoading(false);
                 return;
               }
               await supabase.from('password_resets').delete().eq('token', resetToken);
@@ -1845,7 +1879,9 @@
               setResetToken('');
               setTimeout(() => { setAuthTab('login'); setLoginSuccess(''); }, 2500);
             } catch (err) {
-              setLoginError('Errore: ' + (err.message || String(err)));
+              setLoginError(t.connectionError);
+            } finally {
+              setAuthLoading(false);
             }
           };
 
@@ -1855,13 +1891,16 @@
             if (!isValidEmail(email)) { setLoginError(t.invalidEmail); return; }
             setLoginError('');
             setLoginSuccess('');
-            const { data } = await supabase.from('profiles').select('email').eq('email', email);
-            if (!data || data.length === 0) { setLoginError(t.emailNotFound); return; }
+            setAuthLoading(true);
+            const { data, error: lookErr } = await supabase.from('profiles').select('email').eq('email', email);
+            if (lookErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
+            if (!data || data.length === 0) { setLoginError(t.emailNotFound); setAuthLoading(false); return; }
             try {
               const token = crypto.randomUUID();
               const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
               await supabase.from('magic_links').delete().eq('email', email);
-              await supabase.from('magic_links').insert({ email, token, expires_at: expiresAt });
+              const { error: insErr } = await supabase.from('magic_links').insert({ email, token, expires_at: expiresAt });
+              if (insErr) { setLoginError(t.connectionError); setAuthLoading(false); return; }
               const appUrl = window.location.origin + window.location.pathname;
               const magicUrl = `${appUrl}?magic=${token}`;
               await emailjs.send('service_rk97p6m', 'template_gy8gdkg', {
@@ -1877,7 +1916,9 @@
               setShowMagicLink(false);
             } catch(err) {
               console.error('EmailJS error:', JSON.stringify(err));
-              setLoginError('Errore: ' + (err.text || err.message || JSON.stringify(err)));
+              setLoginError(t.connectionError);
+            } finally {
+              setAuthLoading(false);
             }
           };
 
@@ -2946,8 +2987,8 @@
                           placeholder="Password"
                           aria-label="Password"
                         />
-                        <button onClick={handleLogin} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempEmail.trim() || !tempPassword.trim()}>
-                          {t.login}
+                        <button onClick={handleLogin} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempEmail.trim() || !tempPassword.trim() || authLoading}>
+                          {authLoading ? '…' : t.login}
                         </button>
                         <p
                           onClick={() => { setShowResetForm(true); setLoginError(''); setLoginSuccess(''); }}
@@ -2976,8 +3017,8 @@
                               placeholder={t.emailPlaceholder}
                               aria-label={t.emailPlaceholder}
                             />
-                            <button onClick={handleSendMagicLink} className="btn-primary" style={{width: '100%'}} disabled={!magicLinkEmail.trim()}>
-                              {t.sendMagicLink}
+                            <button onClick={handleSendMagicLink} className="btn-primary" style={{width: '100%'}} disabled={!magicLinkEmail.trim() || authLoading}>
+                              {authLoading ? '…' : t.sendMagicLink}
                             </button>
                           </div>
                         )}
@@ -2996,8 +3037,8 @@
                           placeholder={t.emailPlaceholder}
                           aria-label={t.emailPlaceholder}
                         />
-                        <button onClick={handleSendResetEmail} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim()}>
-                          {t.resetPassword}
+                        <button onClick={handleSendResetEmail} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetEmail.trim() || authLoading}>
+                          {authLoading ? '…' : t.resetPassword}
                         </button>
                         <p
                           onClick={() => { setShowResetForm(false); setLoginError(''); setLoginSuccess(''); }}
@@ -3026,8 +3067,8 @@
                           placeholder={t.confirmPasswordPlaceholder}
                           aria-label={t.confirmPasswordPlaceholder}
                         />
-                        <button onClick={handleSetNewPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetNewPassword.trim() || !resetConfirmPassword.trim()}>
-                          {t.setNewPassword}
+                        <button onClick={handleSetNewPassword} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!resetNewPassword.trim() || !resetConfirmPassword.trim() || authLoading}>
+                          {authLoading ? '…' : t.setNewPassword}
                         </button>
                       </>
                     )}
@@ -3057,8 +3098,8 @@
                           placeholder="Password"
                           aria-label="Password"
                         />
-                        <button onClick={handleRegister} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempNickname.trim() || !tempEmail.trim() || !tempPassword.trim()}>
-                          {t.register}
+                        <button onClick={handleRegister} className="btn-primary" style={{width: '100%', fontSize: '1.125rem'}} disabled={!tempNickname.trim() || !tempEmail.trim() || !tempPassword.trim() || authLoading}>
+                          {authLoading ? '…' : t.register}
                         </button>
                         <p
                           onClick={() => { setAuthTab('login'); setLoginError(''); setLoginSuccess(''); }}
