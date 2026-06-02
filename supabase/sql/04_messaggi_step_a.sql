@@ -77,28 +77,28 @@ END $$;
 GRANT EXECUTE ON FUNCTION public.mark_message_read(uuid, text) TO anon;
 
 -- ----------------------------------------------------------------------------
--- BLOCCO 2 — RICOGNIZIONE policy (eseguire DA SOLO, poi compilare il BLOCCO 3)
+-- BLOCCO 2 — RICOGNIZIONE policy (eseguito 2026-06-02)
 -- ----------------------------------------------------------------------------
--- SELECT policyname, cmd, roles, qual, with_check
---   FROM pg_policies
---  WHERE tablename = 'private_messages';
--- Annotare i nomi delle policy con cmd = INSERT / UPDATE / DELETE / ALL aperte ad anon/public.
+-- SELECT policyname, cmd, roles, qual, with_check FROM pg_policies WHERE tablename = 'private_messages';
+-- Risultato reale: UNA sola policy
+--   "Allow all for anon" | cmd=ALL | roles={public} | qual=true | with_check=true
+-- → porta aperta a tutto (lettura E scrittura) per chiunque.
 
 -- ----------------------------------------------------------------------------
--- BLOCCO 3 — Drop policy aperte di scrittura (PERSONALIZZARE coi nomi reali del BLOCCO 2)
--- Assicurarsi che RLS sia ON e che resti UNA policy SELECT pubblica (la UI legge via REST).
+-- BLOCCO 3 — APPLICATO 2026-06-02: drop della policy ALL aperta + SELECT-only pubblica
 -- ----------------------------------------------------------------------------
--- ALTER TABLE private_messages ENABLE ROW LEVEL SECURITY;  -- (dovrebbe già esserlo)
---
--- DROP POLICY IF EXISTS "<nome_policy_insert_aperta>" ON private_messages;
--- DROP POLICY IF EXISTS "<nome_policy_update_aperta>" ON private_messages;
--- DROP POLICY IF EXISTS "<nome_policy_delete_aperta>" ON private_messages;
--- -- Se le scritture erano coperte da un'unica policy "ALL" (cmd=ALL), droppare quella
--- -- e ricreare SOLO la SELECT pubblica:
--- --   DROP POLICY IF EXISTS "<nome_policy_all>" ON private_messages;
--- --   CREATE POLICY private_messages_select_public ON private_messages FOR SELECT TO anon USING (true);
---
--- NB: NON droppare la policy SELECT (Step A mantiene la lettura pubblica; VULN-1 si chiude in Step B).
+ALTER TABLE private_messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all for anon" ON private_messages;
+
+CREATE POLICY private_messages_select_public
+  ON private_messages
+  FOR SELECT
+  TO public
+  USING (true);
+-- Esito: RLS ON + solo policy SELECT → scritture anon negate per default; scrivono solo
+-- le RPC SECURITY DEFINER del BLOCCO 1. Lettura pubblica mantenuta (Step A NON chiude
+-- VULN-1 lettura né VULN-4 impersonation → Step B).
 
 -- ----------------------------------------------------------------------------
 -- BLOCCO 4 — Verifica post-apply (da REST anon, atteso dopo il drop)
