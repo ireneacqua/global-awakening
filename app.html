@@ -2588,12 +2588,11 @@
 
           const sendChatMessage = async () => {
             if (!newMessage.trim()) return;
-            
-            await supabase.from('chat_messages').insert({
+            const { error } = await supabase.from('chat_messages').insert({
               user_name: nickname || 'Anonymous',
               content: newMessage
             });
-            
+            if (error) { showErrorToast(); return; }  // testo resta nell'input per riprovare
             setNewMessage('');
           };
 
