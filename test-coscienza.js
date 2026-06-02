@@ -137,6 +137,78 @@ async function testNetworkErrorOnPublish() {
   return ok;
 }
 
+// ── Test guasto rete su commento post → toast, rollback, input ripristinato ──
+// Caso indipendente: pubblica un post (serve backend live), espande i commenti
+// (la SELECT deve riuscire), POI abilita l'abort sulle insert dei commenti e invia
+// il commento → toast + rollback ottimistico + testo ripristinato nell'input.
+async function testNetworkErrorOnComment() {
+  console.log('\n📋 Test 11: Guasto rete su commento post → toast + rollback + input ripristinato');
+  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const page = await browser.newPage();
+  let ok = true;
+  const okPass = (m) => { pass(m); };
+  const okFail = (m) => { fail(m); ok = false; };
+  try {
+    // Login ospite (stesso flow di loginAsGuest)
+    await page.goto(APP_URL);
+    await page.waitForSelector('button:has-text("Ospite"), button:has-text("Guest")', { timeout: TIMEOUT });
+    await page.locator('button:has-text("Ospite"), button:has-text("Guest")').first().click();
+    await page.locator('input[placeholder*="username"], input[placeholder*="Username"]').first().fill(`NetTestCmt_${TS}`);
+    await page.locator('button:has-text("Entra come Ospite"), button:has-text("Enter as Guest")').click();
+    await page.waitForSelector('button:has-text("Logout"), button:has-text("Esci")', { timeout: TIMEOUT });
+    // Tab Coscienza
+    await page.locator('button').filter({ hasText: /Coscienza|Consciousness/ }).first().click();
+    await page.waitForSelector('h2:has-text("Feed Coscienza"), h2:has-text("Consciousness Feed")', { timeout: TIMEOUT });
+
+    // Pubblica un post (serve backend live) per avere qualcosa da commentare
+    const postTxt = 'POST per commento NETFAIL ' + Date.now();
+    await page.locator('textarea').first().fill(postTxt);
+    await page.locator('button:has-text("Pubblica"), button:has-text("Post")').first().click();
+    const postCard = page.locator('div.bg-glass').filter({
+      has: page.locator('p.text-white', { hasText: postTxt })
+    }).first();
+    await postCard.waitFor({ state: 'visible', timeout: 8000 });
+
+    // Espandi i commenti del post (la SELECT su consciousness_comments deve riuscire ORA)
+    const commentsToggle = postCard.locator('button.btn-secondary').filter({ hasText: /commenti|comments/ }).first();
+    await commentsToggle.click();
+    const cmtInput = postCard.locator('input[placeholder*="commento"], input[placeholder*="comment"]').first();
+    await cmtInput.waitFor({ timeout: TIMEOUT });
+
+    const cmt = 'COMMENTO NETFAIL ' + Date.now();
+    // ORA blocca le insert dei commenti (la SELECT di espansione è già avvenuta)
+    await page.route('**/consciousness_comments*', r => r.abort());
+    await cmtInput.fill(cmt);
+    await cmtInput.press('Enter');
+
+    // Toast appare
+    try {
+      await page.locator('text=/Problema di connessione|Connection problem/').first().waitFor({ state: 'visible', timeout: 6000 });
+      okPass('Toast d\'errore mostrato su guasto rete in commento');
+    } catch {
+      okFail('Toast d\'errore NON mostrato su guasto rete in commento');
+    }
+
+    // Commento ottimistico rimosso (rollback). Il commento è reso come <p> nella card;
+    // l'input ripristinato non è un <p>, quindi filtriamo sui paragrafi della card.
+    const ghost = await postCard.locator('p').filter({ hasText: cmt }).count();
+    if (ghost === 0) okPass('Commento ottimistico rimosso (rollback)');
+    else okFail('Commento fantasma rimasto');
+
+    // Testo ripristinato nell'input commento
+    const restored = await cmtInput.inputValue();
+    if (restored === cmt) okPass('Testo ripristinato nell\'input commento');
+    else okFail('Testo NON ripristinato (era: "' + restored + '")');
+
+    await page.unroute('**/consciousness_comments*');
+  } catch (e) {
+    okFail('Eccezione nel test guasto rete commento: ' + e.message);
+  } finally {
+    await browser.close();
+  }
+  return ok;
+}
+
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -366,6 +438,13 @@ async function testNetworkErrorOnPublish() {
       await testNetworkErrorOnPublish();
     } catch (e) {
       fail(`Errore nel caso guasto rete: ${e.message}`);
+    }
+
+    // Caso guasto rete su commento (richiede backend live per post + SELECT iniziale)
+    try {
+      await testNetworkErrorOnComment();
+    } catch (e) {
+      fail(`Errore nel caso guasto rete commento: ${e.message}`);
     }
 
     console.log('\n  (Pulizia post e commenti test da Supabase...)');

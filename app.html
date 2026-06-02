@@ -2588,12 +2588,11 @@
 
           const sendChatMessage = async () => {
             if (!newMessage.trim()) return;
-            
-            await supabase.from('chat_messages').insert({
+            const { error } = await supabase.from('chat_messages').insert({
               user_name: nickname || 'Anonymous',
               content: newMessage
             });
-            
+            if (error) { showErrorToast(); return; }  // testo resta nell'input per riprovare
             setNewMessage('');
           };
 
@@ -2847,22 +2846,24 @@
           const createRitualComment = async (ritualId) => {
             const content = (newRitualCommentContents[ritualId] || '').trim();
             if (!content) return;
-            const { data } = await supabase.rpc('create_ritual_comment', {
+            const { data, error } = await supabase.rpc('create_ritual_comment', {
               p_ritual_id: ritualId,
               p_author_nickname: nickname,
               p_content: content
             });
-            if (data && data.length > 0) {
-              setRitualCommentsMap(prev => ({ ...prev, [ritualId]: [...(prev[ritualId] || []), ...data] }));
-              setNewRitualCommentContents(prev => ({ ...prev, [ritualId]: '' }));
-              const ritual = rituals.find(r => r.id === ritualId);
-              if (ritual && ritual.creator && ritual.creator !== nickname) {
-                await supabase.from('notifications').insert({
-                  user_nickname: ritual.creator,
-                  type: 'ritual_comment',
-                  message: `${nickname} ha commentato il tuo rituale "${ritual.name}"`
-                });
-              }
+            if (error || !data || data.length === 0) {
+              showErrorToast();
+              return;
+            }
+            setRitualCommentsMap(prev => ({ ...prev, [ritualId]: [...(prev[ritualId] || []), ...data] }));
+            setNewRitualCommentContents(prev => ({ ...prev, [ritualId]: '' }));
+            const ritual = rituals.find(r => r.id === ritualId);
+            if (ritual && ritual.creator && ritual.creator !== nickname) {
+              await supabase.from('notifications').insert({
+                user_nickname: ritual.creator,
+                type: 'ritual_comment',
+                message: `${nickname} ha commentato il tuo rituale "${ritual.name}"`
+              });
             }
           };
 
@@ -2911,8 +2912,13 @@
             };
             setCommentsMap(prev => ({ ...prev, [postId]: [...(prev[postId] || []), optimistic] }));
             setNewCommentContents(prev => ({ ...prev, [postId]: '' }));
-            // Salva in background
-            await supabase.from('consciousness_comments').insert({ post_id: postId, author_nickname: nickname, content });
+            const { error } = await supabase.from('consciousness_comments').insert({ post_id: postId, author_nickname: nickname, content });
+            if (error) {
+              setCommentsMap(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== optimistic.id) }));  // rollback
+              setNewCommentContents(prev => ({ ...prev, [postId]: content }));  // ripristina testo
+              showErrorToast();
+              return;
+            }
             const post = posts.find(p => p.id === postId);
             if (post && post.author_nickname !== nickname) {
               await supabase.from('notifications').insert({
