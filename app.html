@@ -3345,7 +3345,7 @@
                       style={{whiteSpace: 'nowrap', flex: '1', textAlign: 'center', fontSize: 'clamp(0.75rem, 2.5vw, 1rem)', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem'}}
                     >
                       {t.tabs[tab]}
-                      {tab === 'telepathy' && partner && !sessionEnded && (
+                      {tab === 'telepathy' && partner && !sessionEnded && !partnerDisconnected && (
                         <span
                           className="training-badge pulse-glow"
                           style={{
@@ -4382,7 +4382,7 @@
                 </div>
               )}
 
-              {partner && !sessionEnded && isTabHidden && (
+              {partner && !sessionEnded && !partnerDisconnected && isTabHidden && (
                 <div
                   className="training-floating-banner"
                   onClick={() => setActiveTab('telepathy')}
