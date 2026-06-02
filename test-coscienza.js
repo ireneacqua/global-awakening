@@ -116,9 +116,10 @@ async function testNetworkErrorOnPublish() {
       okFail('Toast d\'errore NON mostrato su guasto rete in pubblicazione');
     }
 
-    // Il post NON resta nel feed (rollback). La textarea contiene il testo ripristinato,
-    // quindi filtriamo sulle card del feed per non contare la textarea.
-    const ghostInFeed = await page.locator('div.bg-glass').filter({ hasText: txt }).count();
+    // Il post NON resta nel feed (rollback). Il contenuto dei post è reso come
+    // <p class="text-white">{post.content}</p> nelle card; la textarea col testo
+    // ripristinato NON è un <p>, quindi filtriamo sui paragrafi del feed.
+    const ghostInFeed = await page.locator('p.text-white').filter({ hasText: txt }).count();
     if (ghostInFeed === 0) okPass('Post ottimistico rimosso (rollback)');
     else okFail('Post fantasma rimasto nel feed dopo errore');
 

@@ -2853,8 +2853,14 @@
             };
             setPosts(prev => [optimistic, ...prev]);
             setNewPostContent('');
-            // Salva in background (sostituisce l'entry ottimistica al prossimo poll)
-            await supabase.from('consciousness_posts').insert({ author_nickname: nickname, content });
+            setSavingContent(true);
+            const { error } = await supabase.from('consciousness_posts').insert({ author_nickname: nickname, content });
+            setSavingContent(false);
+            if (error) {
+              setPosts(prev => prev.filter(p => p.id !== optimistic.id));  // rollback
+              setNewPostContent(content);                                   // ripristina testo
+              showErrorToast();
+            }
           };
 
           const togglePostComments = async (postId) => {
@@ -3479,8 +3485,8 @@
                           onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) createPost(); }}
                         />
                         <div style={{textAlign: 'right'}}>
-                          <button onClick={createPost} className="btn-primary" disabled={!newPostContent.trim()}>
-                            {t.feed.post}
+                          <button onClick={createPost} className="btn-primary" disabled={!newPostContent.trim() || savingContent}>
+                            {savingContent ? '…' : t.feed.post}
                           </button>
                         </div>
                       </div>
