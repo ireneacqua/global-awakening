@@ -80,6 +80,62 @@ async function cleanup() {
   }
 }
 
+// ── Test guasto rete su pubblica post → toast, rollback, testo ripristinato ──
+// Caso indipendente: abilita l'abort sulle insert dei post, pubblica, e verifica
+// toast + rollback + testo ripristinato. NON richiede il backend live (abort).
+async function testNetworkErrorOnPublish() {
+  console.log('\n📋 Test 10: Guasto rete su pubblica post → toast + rollback + testo ripristinato');
+  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const page = await browser.newPage();
+  let ok = true;
+  const okPass = (m) => { pass(m); };
+  const okFail = (m) => { fail(m); ok = false; };
+  try {
+    // Login ospite (stesso flow di loginAsGuest)
+    await page.goto(APP_URL);
+    await page.waitForSelector('button:has-text("Ospite"), button:has-text("Guest")', { timeout: TIMEOUT });
+    await page.locator('button:has-text("Ospite"), button:has-text("Guest")').first().click();
+    await page.locator('input[placeholder*="username"], input[placeholder*="Username"]').first().fill(`NetTestPost_${TS}`);
+    await page.locator('button:has-text("Entra come Ospite"), button:has-text("Enter as Guest")').click();
+    await page.waitForSelector('button:has-text("Logout"), button:has-text("Esci")', { timeout: TIMEOUT });
+    // Tab Coscienza
+    await page.locator('button').filter({ hasText: /Coscienza|Consciousness/ }).first().click();
+    await page.waitForSelector('h2:has-text("Feed Coscienza"), h2:has-text("Consciousness Feed")', { timeout: TIMEOUT });
+
+    const txt = 'POST NETFAIL ' + Date.now();
+    // Blocca le insert dei post (anche le SELECT del poll, ma il caso valuta solo il fallimento dell'insert)
+    await page.route('**/consciousness_posts*', r => r.abort());
+    await page.locator('textarea').first().fill(txt);
+    await page.locator('button:has-text("Pubblica"), button:has-text("Post")').first().click();
+
+    // Toast appare
+    try {
+      await page.locator('text=/Problema di connessione|Connection problem/').first().waitFor({ state: 'visible', timeout: 6000 });
+      okPass('Toast d\'errore mostrato su guasto rete in pubblicazione');
+    } catch {
+      okFail('Toast d\'errore NON mostrato su guasto rete in pubblicazione');
+    }
+
+    // Il post NON resta nel feed (rollback). La textarea contiene il testo ripristinato,
+    // quindi filtriamo sulle card del feed per non contare la textarea.
+    const ghostInFeed = await page.locator('div.bg-glass').filter({ hasText: txt }).count();
+    if (ghostInFeed === 0) okPass('Post ottimistico rimosso (rollback)');
+    else okFail('Post fantasma rimasto nel feed dopo errore');
+
+    // Testo ripristinato nella textarea
+    const restored = await page.locator('textarea').first().inputValue();
+    if (restored === txt) okPass('Testo ripristinato nella textarea');
+    else okFail('Testo NON ripristinato (era: "' + restored + '")');
+
+    await page.unroute('**/consciousness_posts*');
+  } catch (e) {
+    okFail('Eccezione nel test guasto rete: ' + e.message);
+  } finally {
+    await browser.close();
+  }
+  return ok;
+}
+
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -304,6 +360,13 @@ async function cleanup() {
     fail(`Errore imprevisto: ${err.message}`);
     console.error(err);
   } finally {
+    // Caso guasto rete (browser dedicato, non richiede backend live)
+    try {
+      await testNetworkErrorOnPublish();
+    } catch (e) {
+      fail(`Errore nel caso guasto rete: ${e.message}`);
+    }
+
     console.log('\n  (Pulizia post e commenti test da Supabase...)');
     await cleanup();
 
