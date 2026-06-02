@@ -84,6 +84,69 @@ async function cleanup() {
   }
 }
 
+// ── Test guasto rete su crea-rituale → toast, modale aperto, nessun fantasma ──
+// Caso indipendente: abilita l'abort sull'RPC create_ritual, apre il modale, compila
+// e crea. NON richiede backend live (abort). Selettori del modale come nel Test 8.
+async function testNetworkErrorOnCreateRitual() {
+  console.log('\n📋 Test 9: Guasto rete su crea-rituale → toast + modale aperto + nessun fantasma');
+  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const page = await browser.newPage();
+  let ok = true;
+  const okPass = (m) => { pass(m); };
+  const okFail = (m) => { fail(m); ok = false; };
+  try {
+    // Login ospite (stesso flow di loginAsGuest)
+    await page.goto(APP_URL);
+    await page.waitForSelector('button:has-text("Ospite"), button:has-text("Guest")', { timeout: TIMEOUT });
+    await page.locator('button:has-text("Ospite"), button:has-text("Guest")').first().click();
+    await page.locator('input[placeholder*="username"], input[placeholder*="Username"]').first().fill(`NetTestRit_${TS}`);
+    await page.locator('button:has-text("Entra come Ospite"), button:has-text("Enter as Guest")').click();
+    await page.waitForSelector('button:has-text("Logout"), button:has-text("Esci")', { timeout: TIMEOUT });
+    // Tab Rituali
+    await page.locator('button').filter({ hasText: /Rituali|Rituals/ }).first().click();
+    await page.waitForSelector('h2:has-text("Rituali Globali"), h2:has-text("Global Rituals")', { timeout: TIMEOUT });
+
+    // Apri il modale crea-rituale (come nel Test 8)
+    await page.locator('button:has-text("Proponi Rituale"), button:has-text("Propose Ritual")').first().click();
+    await page.locator('input[type="date"]').waitFor({ timeout: TIMEOUT });
+
+    const rname = 'RIT NETFAIL ' + Date.now();
+    // Blocca l'RPC create_ritual
+    await page.route('**/rpc/create_ritual', r => r.abort());
+    // Compila i campi del modale (selettori reali dal Test 8)
+    await page.locator('input[placeholder="e.g., Full Moon Meditation"]').fill(rname);
+    await page.locator('input[type="date"]').fill('2099-12-31');
+    await page.locator('input[type="time"]').fill('12:00');
+    // Submit: ultimo "Crea Rituale" nel modale (evita bottoni esterni)
+    await page.locator('button:has-text("Crea Rituale"), button:has-text("Create Ritual")').last().click();
+
+    // Toast appare
+    try {
+      await page.locator('text=/Problema di connessione|Connection problem/').first().waitFor({ state: 'visible', timeout: 6000 });
+      okPass('Toast d\'errore mostrato su guasto rete in creazione rituale');
+    } catch {
+      okFail('Toast d\'errore NON mostrato su guasto rete in creazione rituale');
+    }
+
+    // Modale resta aperto
+    const modalOpen = await page.locator('.modal-content').count();
+    if (modalOpen > 0) okPass('Modale resta aperto dopo errore');
+    else okFail('Modale chiuso nonostante l\'errore');
+
+    // Nessun rituale fantasma in lista
+    const ghost = await page.locator('.ritual-card').filter({ hasText: rname }).count();
+    if (ghost === 0) okPass('Nessun rituale fantasma in lista');
+    else okFail('Rituale fantasma comparso in lista');
+
+    await page.unroute('**/rpc/create_ritual');
+  } catch (e) {
+    okFail('Eccezione nel test guasto rete: ' + e.message);
+  } finally {
+    await browser.close();
+  }
+  return ok;
+}
+
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -314,6 +377,13 @@ async function cleanup() {
     fail(`Errore imprevisto: ${err.message}`);
     console.error(err);
   } finally {
+    // Caso guasto rete (browser dedicato, non richiede backend live)
+    try {
+      await testNetworkErrorOnCreateRitual();
+    } catch (e) {
+      fail(`Errore nel caso guasto rete: ${e.message}`);
+    }
+
     console.log('\n  (Pulizia rituali e commenti test da Supabase...)');
     await cleanup();
 

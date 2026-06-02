@@ -158,6 +158,13 @@
             to   { transform: translateY(0);    opacity: 1; }
         }
 
+        /* Toast centrato in basso: sale verticalmente mantenendo il centraggio
+           orizzontale (translateX(-50%) in entrambi i frame, altrimenti scatto). */
+        @keyframes toast-rise {
+            from { transform: translateX(-50%) translateY(120%); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+        }
+
         @keyframes ripple {
             0% { transform: scale(0.8); opacity: 1; }
             100% { transform: scale(2.5); opacity: 0; }
@@ -1224,6 +1231,8 @@
           const [passwordHash, setPasswordHash] = useState(null);
           const [loginError, setLoginError] = useState('');
           const [authLoading, setAuthLoading] = useState(false);
+          const [errorToast, setErrorToast] = useState(null);
+          const [savingContent, setSavingContent] = useState(false);
           const [loginSuccess, setLoginSuccess] = useState('');
           const [profilePassword, setProfilePassword] = useState('');
           const [profilePasswordMsg, setProfilePasswordMsg] = useState('');
@@ -1291,6 +1300,13 @@
             document.addEventListener('keydown', onKeyDown);
             return () => document.removeEventListener('keydown', onKeyDown);
           }, [showPrivacy, showLogoutConfirm, showEndSessionConfirm, showCreateRitual, showEditProfile, viewingProfile, showNotifPanel]);
+
+          // Toast d'errore: auto-dismiss dopo 4s.
+          useEffect(() => {
+            if (!errorToast) return;
+            const tmr = setTimeout(() => setErrorToast(null), 4000);
+            return () => clearTimeout(tmr);
+          }, [errorToast]);
 
           // Pulizia stato remoto alla chiusura del tab.
           // sendBeacon non supporta DELETE: usiamo fetch con keepalive=true che il browser
@@ -2659,8 +2675,10 @@
             ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
           };
 
+          const showErrorToast = (msg) => setErrorToast(msg || t.connectionError);
+
           const sendPrivateMessage = async (receiverName, text) => {
-            if (!text.trim() || !receiverName) return;
+            if (!text.trim() || !receiverName) return false;
             const { data, error } = await supabase.from('private_messages').insert({
               sender_id: sessionId,
               sender_name: nickname || 'Anonymous',
@@ -2668,17 +2686,32 @@
               content: text.trim(),
               is_read: false
             });
-            if (!error) {
-              // Optimistic UI: aggiungi subito il messaggio allo stato locale cosi'
-              // il mittente lo vede senza aspettare il prossimo poll (ogni 8s).
-              if (Array.isArray(data) && data.length > 0) {
-                setPrivateMessages(prev => [...prev, data[0]]);
-              }
-              await supabase.from('notifications').insert({
-                user_nickname: receiverName,
-                type: 'private_message',
-                message: `${nickname} ti ha inviato un messaggio privato`
-              });
+            if (error) return false;
+            // Optimistic UI: aggiungi subito il messaggio allo stato locale cosi'
+            // il mittente lo vede senza aspettare il prossimo poll (ogni 8s).
+            if (Array.isArray(data) && data.length > 0) {
+              setPrivateMessages(prev => [...prev, data[0]]);
+            }
+            await supabase.from('notifications').insert({
+              user_nickname: receiverName,
+              type: 'private_message',
+              message: `${nickname} ti ha inviato un messaggio privato`
+            });
+            return true;
+          };
+
+          const submitPrivateMessage = async () => {
+            const txt = newPrivateMessage;
+            if (!txt.trim() || !viewingProfile || savingContent) return;
+            setNewPrivateMessage('');
+            setSavingContent(true);
+            const ok = await sendPrivateMessage(viewingProfile.nickname, txt);
+            setSavingContent(false);
+            if (ok) {
+              markAsRead(viewingProfile.nickname);
+            } else {
+              setNewPrivateMessage(txt);  // ripristina testo
+              showErrorToast();
             }
           };
 
@@ -2709,6 +2742,7 @@
               energy: 0
             };
 
+            setSavingContent(true);
             try {
               const { data, error } = await supabase.rpc('create_ritual', {
                 p_creator: ritualData.creator,
@@ -2721,20 +2755,22 @@
                 p_time: ritualData.time,
                 p_duration: ritualData.duration
               });
-
               if (error) {
                 console.warn('Supabase RPC create_ritual error:', error);
-                const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
-                setRituals(prev => [localRitual, ...prev]);
-              } else if (Array.isArray(data) && data[0]) {
+                setSavingContent(false);
+                showErrorToast();
+                return;  // modale resta aperto, form non svuotato
+              }
+              if (Array.isArray(data) && data[0]) {
                 setRituals(prev => [data[0], ...prev]);
               }
             } catch (err) {
               console.warn('Create ritual failed:', err);
-              const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
-              setRituals(prev => [localRitual, ...prev]);
+              setSavingContent(false);
+              showErrorToast();
+              return;
             }
-
+            setSavingContent(false);
             setShowCreateRitual(false);
             setNewRitual({
               name: '',
@@ -2842,8 +2878,14 @@
             };
             setPosts(prev => [optimistic, ...prev]);
             setNewPostContent('');
-            // Salva in background (sostituisce l'entry ottimistica al prossimo poll)
-            await supabase.from('consciousness_posts').insert({ author_nickname: nickname, content });
+            setSavingContent(true);
+            const { error } = await supabase.from('consciousness_posts').insert({ author_nickname: nickname, content });
+            setSavingContent(false);
+            if (error) {
+              setPosts(prev => prev.filter(p => p.id !== optimistic.id));  // rollback
+              setNewPostContent(content);                                   // ripristina testo
+              showErrorToast();
+            }
           };
 
           const togglePostComments = async (postId) => {
@@ -3468,8 +3510,8 @@
                           onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) createPost(); }}
                         />
                         <div style={{textAlign: 'right'}}>
-                          <button onClick={createPost} className="btn-primary" disabled={!newPostContent.trim()}>
-                            {t.feed.post}
+                          <button onClick={createPost} className="btn-primary" disabled={!newPostContent.trim() || savingContent}>
+                            {savingContent ? '…' : t.feed.post}
                           </button>
                         </div>
                       </div>
@@ -4242,9 +4284,7 @@
                                   onChange={(e) => setNewPrivateMessage(e.target.value)}
                                   onKeyPress={(e) => {
                                     if (e.key === 'Enter' && newPrivateMessage.trim()) {
-                                      sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
-                                      setNewPrivateMessage('');
-                                      markAsRead(viewingProfile.nickname);
+                                      submitPrivateMessage();
                                     }
                                   }}
                                   placeholder={t.messages.placeholder}
@@ -4252,16 +4292,11 @@
                                   style={{flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem'}}
                                 />
                                 <button
-                                  onClick={() => {
-                                    if (newPrivateMessage.trim()) {
-                                      sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
-                                      setNewPrivateMessage('');
-                                      markAsRead(viewingProfile.nickname);
-                                    }
-                                  }}
+                                  onClick={() => { if (newPrivateMessage.trim()) submitPrivateMessage(); }}
                                   className="btn-primary"
                                   style={{padding: '0.5rem 1rem'}}
                                   aria-label={t.messages.send}
+                                  disabled={savingContent}
                                 >
                                   <Send style={{width: '1rem', height: '1rem'}} />
                                 </button>
@@ -4276,6 +4311,20 @@
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {errorToast && (
+                <div role="alert" style={{
+                  position: 'fixed', bottom: '1rem', left: '50%', transform: 'translateX(-50%)',
+                  width: 'min(360px, calc(100vw - 2rem))',
+                  background: 'linear-gradient(135deg, rgba(220,38,38,0.96) 0%, rgba(248,113,113,0.93) 100%)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  boxShadow: '0 12px 40px rgba(220,38,38,0.45)',
+                  borderRadius: '0.85rem', padding: '0.85rem 1rem', zIndex: 9999,
+                  animation: 'toast-rise 0.35s ease-out'
+                }}>
+                  <p className="text-white font-bold" style={{fontSize: '0.9rem', margin: 0, textAlign: 'center'}}>⚠️ {errorToast}</p>
                 </div>
               )}
 
@@ -4471,8 +4520,8 @@
                         <button onClick={() => setShowCreateRitual(false)} className="btn-secondary w-full">
                           {t.rituals.cancel}
                         </button>
-                        <button onClick={createRitual} className="btn-primary w-full">
-                          {t.rituals.create}
+                        <button onClick={createRitual} className="btn-primary w-full" disabled={savingContent}>
+                          {savingContent ? '…' : t.rituals.create}
                         </button>
                       </div>
                     </div>
