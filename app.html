@@ -2671,7 +2671,7 @@
           const showErrorToast = (msg) => setErrorToast(msg || t.connectionError);
 
           const sendPrivateMessage = async (receiverName, text) => {
-            if (!text.trim() || !receiverName) return;
+            if (!text.trim() || !receiverName) return false;
             const { data, error } = await supabase.from('private_messages').insert({
               sender_id: sessionId,
               sender_name: nickname || 'Anonymous',
@@ -2679,17 +2679,32 @@
               content: text.trim(),
               is_read: false
             });
-            if (!error) {
-              // Optimistic UI: aggiungi subito il messaggio allo stato locale cosi'
-              // il mittente lo vede senza aspettare il prossimo poll (ogni 8s).
-              if (Array.isArray(data) && data.length > 0) {
-                setPrivateMessages(prev => [...prev, data[0]]);
-              }
-              await supabase.from('notifications').insert({
-                user_nickname: receiverName,
-                type: 'private_message',
-                message: `${nickname} ti ha inviato un messaggio privato`
-              });
+            if (error) return false;
+            // Optimistic UI: aggiungi subito il messaggio allo stato locale cosi'
+            // il mittente lo vede senza aspettare il prossimo poll (ogni 8s).
+            if (Array.isArray(data) && data.length > 0) {
+              setPrivateMessages(prev => [...prev, data[0]]);
+            }
+            await supabase.from('notifications').insert({
+              user_nickname: receiverName,
+              type: 'private_message',
+              message: `${nickname} ti ha inviato un messaggio privato`
+            });
+            return true;
+          };
+
+          const submitPrivateMessage = async () => {
+            const txt = newPrivateMessage;
+            if (!txt.trim() || !viewingProfile) return;
+            setNewPrivateMessage('');
+            setSavingContent(true);
+            const ok = await sendPrivateMessage(viewingProfile.nickname, txt);
+            setSavingContent(false);
+            if (ok) {
+              markAsRead(viewingProfile.nickname);
+            } else {
+              setNewPrivateMessage(txt);  // ripristina testo
+              showErrorToast();
             }
           };
 
@@ -4262,9 +4277,7 @@
                                   onChange={(e) => setNewPrivateMessage(e.target.value)}
                                   onKeyPress={(e) => {
                                     if (e.key === 'Enter' && newPrivateMessage.trim()) {
-                                      sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
-                                      setNewPrivateMessage('');
-                                      markAsRead(viewingProfile.nickname);
+                                      submitPrivateMessage();
                                     }
                                   }}
                                   placeholder={t.messages.placeholder}
@@ -4272,16 +4285,11 @@
                                   style={{flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem'}}
                                 />
                                 <button
-                                  onClick={() => {
-                                    if (newPrivateMessage.trim()) {
-                                      sendPrivateMessage(viewingProfile.nickname, newPrivateMessage);
-                                      setNewPrivateMessage('');
-                                      markAsRead(viewingProfile.nickname);
-                                    }
-                                  }}
+                                  onClick={() => { if (newPrivateMessage.trim()) submitPrivateMessage(); }}
                                   className="btn-primary"
                                   style={{padding: '0.5rem 1rem'}}
                                   aria-label={t.messages.send}
+                                  disabled={savingContent}
                                 >
                                   <Send style={{width: '1rem', height: '1rem'}} />
                                 </button>
