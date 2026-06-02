@@ -2720,6 +2720,7 @@
               energy: 0
             };
 
+            setSavingContent(true);
             try {
               const { data, error } = await supabase.rpc('create_ritual', {
                 p_creator: ritualData.creator,
@@ -2732,20 +2733,22 @@
                 p_time: ritualData.time,
                 p_duration: ritualData.duration
               });
-
               if (error) {
                 console.warn('Supabase RPC create_ritual error:', error);
-                const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
-                setRituals(prev => [localRitual, ...prev]);
-              } else if (Array.isArray(data) && data[0]) {
+                setSavingContent(false);
+                showErrorToast();
+                return;  // modale resta aperto, form non svuotato
+              }
+              if (Array.isArray(data) && data[0]) {
                 setRituals(prev => [data[0], ...prev]);
               }
             } catch (err) {
               console.warn('Create ritual failed:', err);
-              const localRitual = { ...ritualData, id: 'local-' + Date.now(), created_at: new Date().toISOString() };
-              setRituals(prev => [localRitual, ...prev]);
+              setSavingContent(false);
+              showErrorToast();
+              return;
             }
-
+            setSavingContent(false);
             setShowCreateRitual(false);
             setNewRitual({
               name: '',
@@ -4502,8 +4505,8 @@
                         <button onClick={() => setShowCreateRitual(false)} className="btn-secondary w-full">
                           {t.rituals.cancel}
                         </button>
-                        <button onClick={createRitual} className="btn-primary w-full">
-                          {t.rituals.create}
+                        <button onClick={createRitual} className="btn-primary w-full" disabled={savingContent}>
+                          {savingContent ? '…' : t.rituals.create}
                         </button>
                       </div>
                     </div>
