@@ -2860,7 +2860,8 @@
                 p_sacred_number: ritualData.sacred_number,
                 p_date: ritualData.date,
                 p_time: ritualData.time,
-                p_duration: ritualData.duration
+                p_duration: ritualData.duration,
+                p_password_hash: passwordHash
               });
               if (error) {
                 console.warn('Supabase RPC create_ritual error:', error);
@@ -2903,7 +2904,8 @@
               p_sacred_number: 11,
               p_date: utcDate,
               p_time: utcTime,
-              p_duration: 3
+              p_duration: 3,
+              p_password_hash: passwordHash
             });
           };
 
@@ -2957,7 +2959,8 @@
             const { data, error } = await supabase.rpc('create_ritual_comment', {
               p_ritual_id: ritualId,
               p_author_nickname: nickname,
-              p_content: content
+              p_content: content,
+              p_password_hash: passwordHash
             });
             if (error || !data || data.length === 0) {
               showErrorToast();
