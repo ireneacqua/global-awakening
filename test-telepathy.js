@@ -71,7 +71,8 @@ async function getRole(page) {
 }
 
 async function sendSymbol(page, nickname) {
-  // Sceglie il primo simbolo disponibile
+  // Aspetta che il picker sia pronto (dopo l'auto-avanzamento la schermata può non esserlo ancora)
+  await page.waitForSelector('.symbol-btn', { timeout: TIMEOUT });
   const symbols = page.locator('.symbol-btn').first();
   await symbols.click();
   log(nickname, `Simbolo selezionato`);
@@ -99,11 +100,6 @@ async function waitForResult(page, nickname) {
   const matched = (await page.locator(':text("MATCH TELEPATICO"), :text("TELEPATHIC MATCH")').count()) > 0;
   log(nickname, `Risultato: ${matched ? '✨ MATCH TELEPATICO!' : 'Non questa volta'}`);
   return matched;
-}
-
-async function clickAncora(page, nickname) {
-  await page.locator('button:has-text("Ancora"), button:has-text("Again")').first().click();
-  log(nickname, `Cliccato "Ancora"`);
 }
 
 async function clickTerminaSessione(page, nickname) {
@@ -219,19 +215,16 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     ]);
     pass('Entrambi vedono il risultato del round');
 
-    // ── Test 6: Ancora ─────────────────────────────────────────────────────
-    console.log('\n📋 Test 6: Pulsante "Ancora"');
-    await clickAncora(pageA, 'TestUserA');
-    await clickAncora(pageB, 'TestUserB');
-
-    // Dopo "Ancora" entrambi devono tornare al gioco (sender picker o receiver wait)
-    await pageA.waitForTimeout(3000);
+    // ── Test 6: Auto-avanzamento (no pulsante "Ancora") ────────────────────
+    console.log('\n📋 Test 6: Auto-avanzamento dopo il risultato');
+    // Il gioco riparte da solo dopo ~4s: niente click, si attende l'auto-avanzamento.
+    await pageA.waitForTimeout(8000);
     const symbolsA = await pageA.locator('.symbol-btn').count();
     const waitingA = await pageA.locator(':text("Simbolo inviato"), :text("Aspetta")').count();
     if (symbolsA > 0 || waitingA > 0) {
-      pass('TestUserA tornato in gioco dopo "Ancora"');
+      pass('TestUserA tornato in gioco da solo (auto-avanzamento)');
     } else {
-      fail('TestUserA NON è tornato in gioco dopo "Ancora"');
+      fail('TestUserA NON è tornato in gioco dopo l\'auto-avanzamento');
     }
 
     // ── Test 7: Termina Sessione ───────────────────────────────────────────
@@ -466,13 +459,9 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
         waitForResult(pageB, 'TestUserB'),
       ]);
       log('TestUserA', `Round ${i}/7 completato (ruolo A: ${roleA})`);
-      // Clicca "Ancora" dopo ogni round (anche il 7°) per tornare alla schermata di gioco
-      await Promise.all([
-        pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
-        pageB.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
-      ]);
-      // Attendi che il DB venga aggiornato (clear simboli + round_count avanzato dopo 4s)
-      await pageA.waitForTimeout(5000);
+      // Auto-avanzamento: il gioco riparte da solo dopo ~4s (niente click "Ancora").
+      // Al 7° round appare invece il banner cambio livello e l'auto-avanzamento è bloccato (atteso).
+      await pageA.waitForTimeout(8000);
     }
     if (!swapVerified) fail('Atteso swap dei ruoli al round 4, non rilevato');
 
@@ -546,11 +535,8 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       await sendSymbol(sp, sName);
       await guessSymbol(rp, rName);
       await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
-      await Promise.all([
-        pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
-        pageB.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
-      ]);
-      await pageA.waitForTimeout(5000);
+      // Auto-avanzamento dopo ~4s (niente click "Ancora")
+      await pageA.waitForTimeout(8000);
     }
 
     await Promise.all([

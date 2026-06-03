@@ -904,6 +904,7 @@
               guessedLabel: "Guessed",
               resonance: "Resonance ✨",
               again: "Again",
+              nextMatchIn: "New match in",
               endSessionBtn: "End Session",
               endSessionConfirmTitle: "Leave session?",
               endSessionConfirmBody: "Your partner will be notified. This cannot be undone.",
@@ -1181,6 +1182,7 @@
               guessedLabel: "Indovinato",
               resonance: "Sintonia ✨",
               again: "Ancora",
+              nextMatchIn: "Nuovo match tra",
               endSessionBtn: "Termina Sessione",
               endSessionConfirmTitle: "Uscire dalla sessione?",
               endSessionConfirmBody: "Il tuo partner riceverà la notifica. Non si può tornare indietro.",
@@ -1231,6 +1233,7 @@
           const [guessedSymbol, setGuessedSymbol] = useState(null);
           const [waitingForPartner, setWaitingForPartner] = useState(false);
           const [showResult, setShowResult] = useState(false);
+          const [resultCountdown, setResultCountdown] = useState(null);
           // Tiene traccia dell'ultimo round_count processato per evitare doppio processing
           const lastProcessedRoundRef = React.useRef(-1);
           // Tiene traccia della scelta livello fatta (senza stale-closure nei poll)
@@ -2327,6 +2330,9 @@
                 // Suggerisci cambio livello ogni 7 round
                 if (newRound >= 7 && newRound % 7 === 0) {
                   setShowLevelBanner(true);
+                  // showResult NON resettato qui: l'auto-avanzamento mostra il risultato del
+                  // 7° round per ~4s e poi resetta showResult, lasciando apparire il banner
+                  // (gated da !showResult, render ~4083).
                 }
               }
             };
@@ -2448,6 +2454,29 @@
             const interval = setInterval(checkSenderSent, 2000);
             return () => clearInterval(interval);
           }, [matchId, role, effectiveRole, waitingForPartner, showResult]);
+
+          // Auto-avanzamento: dopo il risultato il gioco riparte da solo dopo 4s (no "Ancora").
+          // 4s = combacia con la pulizia dei simboli (sender, ~2255). Bloccato se c'è il banner
+          // cambio livello (richiede scelta), fine sessione o partner disconnesso.
+          useEffect(() => {
+            if (!showResult || sessionEnded || partnerDisconnected) {
+              setResultCountdown(null);
+              return;
+            }
+            setResultCountdown(4);
+            const tick = setInterval(() => {
+              setResultCountdown((c) => (c && c > 1) ? c - 1 : c);
+            }, 1000);
+            const advance = setTimeout(() => {
+              setShowResult(false);
+              setSelectedSymbol(null);
+              setGuessedSymbol(null);
+              setPartnerSymbol(null);
+              setWaitingForPartner(false);
+              setResultCountdown(null);
+            }, 4500);  // dopo la scrittura round_count del sender (4s): evita la race
+            return () => { clearInterval(tick); clearTimeout(advance); };
+          }, [showResult, sessionEnded, partnerDisconnected]);
 
           const resetTelepathy = () => {
             // Se l'utente abbandona una sessione attiva (non terminata via endSession),
@@ -4132,7 +4161,9 @@
                                 {isMatch && <p className="text-white">{t.telepathy.resonance}</p>}
                               </div>
                               <div className="grid grid-cols-2 gap-4">
-                                <button onClick={() => { setShowResult(false); setSelectedSymbol(null); setGuessedSymbol(null); setPartnerSymbol(null); setWaitingForPartner(false); }} className="btn-primary py-3 font-bold">{t.telepathy.again}</button>
+                                <div className="py-3 font-bold" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa', textAlign: 'center'}}>
+                                  {!showLevelBanner && `${t.telepathy.nextMatchIn} ${resultCountdown ?? 4}`}
+                                </div>
                                 <button onClick={endSession} className="btn-secondary py-3 font-bold">{t.telepathy.endSessionBtn}</button>
                               </div>
                             </div>
