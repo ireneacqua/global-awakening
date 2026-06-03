@@ -694,6 +694,18 @@
             logoutConfirmBody: "You'll return to the welcome screen.",
             logoutConfirmYes: "Log out",
             logoutConfirmNo: "Cancel",
+            gdprTitle: "Your data (GDPR)",
+            gdprExport: "Export my data",
+            gdprExporting: "Preparing…",
+            gdprDelete: "Delete account",
+            gdprDeleteTitle: "Delete your account?",
+            gdprDeleteBody: "This permanently deletes your profile, private messages and scores. Your public posts and comments are kept but shown as \"Utente eliminato\". This cannot be undone.",
+            gdprDeleteConfirmLabel: "Type your nickname to confirm:",
+            gdprDeleteConfirmBtn: "Delete forever",
+            gdprDeleteCancel: "Cancel",
+            gdprDeleting: "Deleting…",
+            gdprExportError: "Export failed. Please try again.",
+            gdprDeleteError: "Deletion failed. Please try again.",
             tabs: { rituals: "Rituals", telepathy: "Telepathy", consciousness: "Consciousness" },
             showTelepathyScore: "Show telepathy score",
             editProfile: "Edit Profile",
@@ -951,6 +963,18 @@
             logoutConfirmBody: "Tornerai alla schermata di accesso.",
             logoutConfirmYes: "Esci",
             logoutConfirmNo: "Annulla",
+            gdprTitle: "I tuoi dati (GDPR)",
+            gdprExport: "Esporta i miei dati",
+            gdprExporting: "Preparazione…",
+            gdprDelete: "Elimina account",
+            gdprDeleteTitle: "Vuoi eliminare l'account?",
+            gdprDeleteBody: "Questo elimina definitivamente profilo, messaggi privati e punteggi. I tuoi post e commenti pubblici restano ma appariranno come \"Utente eliminato\". L'operazione non è reversibile.",
+            gdprDeleteConfirmLabel: "Digita il tuo nickname per confermare:",
+            gdprDeleteConfirmBtn: "Elimina per sempre",
+            gdprDeleteCancel: "Annulla",
+            gdprDeleting: "Eliminazione…",
+            gdprExportError: "Export non riuscito. Riprova.",
+            gdprDeleteError: "Eliminazione non riuscita. Riprova.",
             tabs: { rituals: "Rituali", telepathy: "Telepatia", consciousness: "Coscienza" },
             showTelepathyScore: "Mostra punteggio telepatia",
             editProfile: "Modifica Profilo",
@@ -1313,6 +1337,9 @@
           const [profileSaved, setProfileSaved] = useState(false);
           const [viewingProfile, setViewingProfile] = useState(null);
           const [showEditProfile, setShowEditProfile] = useState(false);
+          const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+          const [deleteConfirmText, setDeleteConfirmText] = useState('');
+          const [gdprBusy, setGdprBusy] = useState(false);
           const [showTelepathyScore, setShowTelepathyScore] = useState(() => {
             const stored = localStorage.getItem('ga_show_telepathy');
             return stored !== null ? stored === 'true' : true;
@@ -2079,6 +2106,43 @@
             setSessionMatches(0);
             setRoundCount(0);
             setShowNicknamePrompt(true);
+          };
+
+          // Export GDPR: chiama la RPC, scarica il risultato come file JSON.
+          const exportMyData = async () => {
+            if (gdprBusy) return;
+            setGdprBusy(true);
+            const { data, error } = await supabase.rpc('export_my_account', {
+              p_nickname: nickname,
+              p_password_hash: passwordHash
+            });
+            setGdprBusy(false);
+            if (error || !data) { showErrorToast(t.gdprExportError); return; }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `global-awakening-dati-${nickname}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          // Delete GDPR: chiama la RPC; a successo logout completo + chiusura modali.
+          const confirmDeleteAccount = async () => {
+            if (gdprBusy) return;
+            setGdprBusy(true);
+            const { error } = await supabase.rpc('delete_my_account', {
+              p_nickname: nickname,
+              p_password_hash: passwordHash
+            });
+            setGdprBusy(false);
+            if (error) { showErrorToast(t.gdprDeleteError); return; }
+            setShowDeleteAccount(false);
+            setDeleteConfirmText('');
+            setShowEditProfile(false);
+            handleLogout();
           };
 
           const startSearching = () => {
