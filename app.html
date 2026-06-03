@@ -2424,7 +2424,7 @@
             // Dedup: se ho gia' un invito pending verso qualcuno, non spammare un secondo.
             // L'utente puo' annullare il primo (flusso futuro) o aspettare scadenza/accept.
             if (directInviteTarget) {
-              console.warn('sendDirectInvite: invito gia\' pending verso', directInviteTarget.nickname);
+              console.warn('sendDirectInvite: invito gia\' pending, ignoro il secondo');  // niente PII nel log (D4)
               return;
             }
             setDirectInviteTarget(targetUser);
