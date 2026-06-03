@@ -447,22 +447,25 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     ]);
     log('TestUserA', 'Sessione avviata per test cambio livello (7 round)');
 
-    const roleA4 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
-    const isSenderA4 = roleA4.trim() === 'Sender' || roleA4.trim() === 'Mittente';
-    const sp4 = isSenderA4 ? pageA : pageB;
-    const rp4 = isSenderA4 ? pageB : pageA;
-    const sName4 = isSenderA4 ? 'TestUserA' : 'TestUserB';
-    const rName4 = isSenderA4 ? 'TestUserB' : 'TestUserA';
-
-    // Gioca 7 round
+    // Gioca 7 round — i ruoli si ALTERNANO ogni 3 round (Batch C #5), quindi
+    // determiniamo sender/receiver DINAMICAMENTE a ogni round leggendo la UI.
+    let roleAtRound1 = null, swapVerified = false;
     for (let i = 1; i <= 7; i++) {
-      await sendSymbol(sp4, sName4);
-      await guessSymbol(rp4, rName4);
+      const roleA = (await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent()).trim();
+      const isSenderA = roleA === 'Sender' || roleA === 'Mittente';
+      if (i === 1) roleAtRound1 = roleA;
+      if (i === 4 && roleA !== roleAtRound1 && !swapVerified) { pass('Ruoli invertiti al round 4 (alternanza ogni 3 round)'); swapVerified = true; }
+      const sp = isSenderA ? pageA : pageB;
+      const rp = isSenderA ? pageB : pageA;
+      const sName = isSenderA ? 'TestUserA' : 'TestUserB';
+      const rName = isSenderA ? 'TestUserB' : 'TestUserA';
+      await sendSymbol(sp, sName);
+      await guessSymbol(rp, rName);
       await Promise.all([
         waitForResult(pageA, 'TestUserA'),
         waitForResult(pageB, 'TestUserB'),
       ]);
-      log('TestUserA', `Round ${i}/7 completato`);
+      log('TestUserA', `Round ${i}/7 completato (ruolo A: ${roleA})`);
       // Clicca "Ancora" dopo ogni round (anche il 7°) per tornare alla schermata di gioco
       await Promise.all([
         pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
@@ -471,6 +474,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       // Attendi che il DB venga aggiornato (clear simboli + round_count avanzato dopo 4s)
       await pageA.waitForTimeout(5000);
     }
+    if (!swapVerified) fail('Atteso swap dei ruoli al round 4, non rilevato');
 
     // Dopo il 7° round + "Ancora" il banner deve essere visibile (showLevelBanner=true, showResult=false)
     await Promise.all([
@@ -531,17 +535,16 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       waitForPartnerFound(pageB, 'TestUserB'),
     ]);
 
-    const roleA5 = await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent();
-    const isSenderA5 = roleA5.trim() === 'Sender' || roleA5.trim() === 'Mittente';
-    const sp5 = isSenderA5 ? pageA : pageB;
-    const rp5 = isSenderA5 ? pageB : pageA;
-    const sName5 = isSenderA5 ? 'TestUserA' : 'TestUserB';
-    const rName5 = isSenderA5 ? 'TestUserB' : 'TestUserA';
-
-    // Gioca 7 round per far apparire il banner cambio livello
+    // Gioca 7 round (ruoli role-aware: si alternano ogni 3 round) per far apparire il banner cambio livello
     for (let i = 1; i <= 7; i++) {
-      await sendSymbol(sp5, sName5);
-      await guessSymbol(rp5, rName5);
+      const roleA = (await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent()).trim();
+      const isSenderA = roleA === 'Sender' || roleA === 'Mittente';
+      const sp = isSenderA ? pageA : pageB;
+      const rp = isSenderA ? pageB : pageA;
+      const sName = isSenderA ? 'TestUserA' : 'TestUserB';
+      const rName = isSenderA ? 'TestUserB' : 'TestUserA';
+      await sendSymbol(sp, sName);
+      await guessSymbol(rp, rName);
       await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
       await Promise.all([
         pageA.locator('button:has-text("Ancora"), button:has-text("Again")').first().click(),
