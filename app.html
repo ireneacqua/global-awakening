@@ -861,6 +861,8 @@
               partner: "Partner",
               ok: "OK",
               yourRole: "Your role",
+              roleSwappedSender: "🔄 Roles swapped! You are now the Sender",
+              roleSwappedReceiver: "🔄 Roles swapped! You are now the Receiver",
               roleSender: "Sender",
               roleReceiver: "Receiver",
               roundLabel: "Round",
@@ -1132,6 +1134,8 @@
               partner: "Partner",
               ok: "Ok",
               yourRole: "Il tuo ruolo",
+              roleSwappedSender: "🔄 Ruoli invertiti! Ora sei il Mittente",
+              roleSwappedReceiver: "🔄 Ruoli invertiti! Ora sei il Ricevente",
               roleSender: "Mittente",
               roleReceiver: "Ricevitore",
               roundLabel: "Round",
@@ -1219,6 +1223,12 @@
           const [directInviteTarget, setDirectInviteTarget] = useState(null); // utente a cui abbiamo inviato invito
           const [currentLevel, setCurrentLevel] = useState('shapes'); // 'shapes' | 'numbers' | 'words'
           const [roundCount, setRoundCount] = useState(0);
+          const [roleSwapNotice, setRoleSwapNotice] = useState(null);
+          const swapRole = (r) => r === 'sender' ? 'receiver' : 'sender';
+          // round 0-based: 0,1,2 -> base; 3,4,5 -> swap; ... (alternanza ogni 3 round)
+          const roleForRound = (baseRole, round) =>
+            (Math.floor(round / 3) % 2 === 0) ? baseRole : swapRole(baseRole);
+          const effectiveRole = role ? roleForRound(role, roundCount) : role;
           const [sessionMatches, setSessionMatches] = useState(0);
           const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false);
           const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
