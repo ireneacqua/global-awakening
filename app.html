@@ -759,6 +759,8 @@
               join: "Join",
               joined: "Joined",
               sendEnergy: "Send Energy",
+              candleLight: "Light a candle",
+              candleExtinguish: "Extinguish your candle",
               modalTitle: "Create Ritual",
               ritualName: "Ritual Name",
               description: "Description",
@@ -1028,6 +1030,8 @@
               join: "Unisciti",
               joined: "Unito",
               sendEnergy: "Invia Energia",
+              candleLight: "Accendi una candela",
+              candleExtinguish: "Spegni la tua candela",
               modalTitle: "Crea Rituale",
               ritualName: "Nome Rituale",
               description: "Descrizione",
@@ -2928,6 +2932,15 @@
             await supabase.rpc('send_ritual_energy', { p_ritual_id: ritualId, p_amount: 10 });
           };
 
+          const toggleCandle = async (ritualId) => {
+            const { data, error } = await supabase.rpc('toggle_ritual_candle', {
+              p_ritual_id: ritualId,
+              p_session_id: sessionId
+            });
+            if (error || !data || data.length === 0) { showErrorToast(); return; }
+            setRituals(prev => prev.map(r => r.id === ritualId ? data[0] : r));
+          };
+
           const getRitualStatus = (ritual) => {
             const now = new Date();
             const ritualTime = new Date(`${ritual.date}T${ritual.time}Z`);
@@ -3504,6 +3517,8 @@
                         const status = getRitualStatus(ritual);
                         const isLive = status === 'live';
                         const isJoined = ritual.participants.includes(sessionId);
+                        const candleCount = (ritual.candles || []).length;
+                        const isCandleLit = (ritual.candles || []).includes(sessionId);
                         
                         const ritualComments = ritualCommentsMap[ritual.id] || [];
                         const isRitualExpanded = expandedRitualId === ritual.id;
@@ -3553,6 +3568,22 @@
                                   ⚡ {ritual.energy}
                                 </button>
                               )}
+                              <button
+                                onClick={() => toggleCandle(ritual.id)}
+                                className="px-4"
+                                aria-label={isCandleLit ? t.rituals.candleExtinguish : t.rituals.candleLight}
+                                title={isCandleLit ? t.rituals.candleExtinguish : t.rituals.candleLight}
+                                style={{
+                                  borderRadius: '0.75rem',
+                                  border: isCandleLit ? '1px solid rgba(251,191,36,0.7)' : '1px solid rgba(255,255,255,0.2)',
+                                  background: isCandleLit ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.06)',
+                                  color: '#fff',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <span style={{filter: isCandleLit ? 'none' : 'grayscale(1) opacity(0.6)'}}>🕯️</span> {candleCount}
+                              </button>
                             </div>
 
                             <div className="flex gap-2">
