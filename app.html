@@ -1480,8 +1480,8 @@
 
                 if (upsertError) console.warn('Presence upsert error:', upsertError);
 
-                // Clean old users
-                await supabase.from('online_users').delete().lt('last_seen', new Date(Date.now() - 60000).toISOString());
+                // Clean old users (finestra tollerante: 2 min, regge brevi background mobile)
+                await supabase.from('online_users').delete().lt('last_seen', new Date(Date.now() - 120000).toISOString());
 
                 // Fetch current online users
                 const { data, error: fetchError } = await supabase.from('online_users').select('*');
@@ -1539,9 +1539,15 @@
             };
 
             updatePresence();
-            const interval = setInterval(updatePresence, 10000);
+            // Battito più frequente (4s) per una presenza reattiva (conta per telepatia/community).
+            const interval = setInterval(updatePresence, 4000);
+            // Risveglio: al ritorno in primo piano (riapertura app/tab mobile, dove i timer
+            // erano congelati) riscrive e rilegge SUBITO, senza aspettare il prossimo giro.
+            const onVisible = () => { if (document.visibilityState === 'visible') updatePresence(); };
+            document.addEventListener('visibilitychange', onVisible);
             return () => {
               clearInterval(interval);
+              document.removeEventListener('visibilitychange', onVisible);
               supabase.from('online_users').delete().eq('id', sessionId);
             };
           }, [nickname, sessionId]);
