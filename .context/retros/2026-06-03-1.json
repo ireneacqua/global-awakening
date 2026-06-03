@@ -1,0 +1,40 @@
+{
+  "date": "2026-06-03",
+  "window": "1d",
+  "metrics": {
+    "commits": 24,
+    "contributors": 1,
+    "prs_merged": 0,
+    "insertions": 2697,
+    "deletions": 64,
+    "net_loc": 2633,
+    "test_loc": 778,
+    "test_ratio": 0.29,
+    "active_days": 1,
+    "sessions": 1,
+    "deep_sessions": 1,
+    "avg_session_minutes": 141,
+    "loc_per_session_hour": 1150,
+    "feat_pct": 0.375,
+    "docs_pct": 0.375,
+    "test_pct": 0.125,
+    "peak_hour": 11,
+    "ai_assisted_commits": 24
+  },
+  "authors": {
+    "Irene Brambilla": { "commits": 24, "insertions": 2697, "deletions": 64, "test_ratio": 0.29, "top_area": "app.html" }
+  },
+  "shipped": [
+    "D2/D3 GDPR export+delete account",
+    "rimozione chat globale (codice morto)",
+    "B6 anti-impersonazione rituali/commenti (VULN-4)",
+    "D4 PII fuori dai log",
+    "C3 verifica token one-shot",
+    "B7 drop tabelle morte",
+    "candela rituali (Batch D #10)",
+    "alternanza ruoli telepatia (Batch C #5)"
+  ],
+  "sql_migrations": ["06_account_gdpr", "07_rituali_step_b", "08_drop_dead_tables", "09_ritual_candles"],
+  "streak_days": 3,
+  "tweetable": "03 giu: 24 commit, +2.6k LOC, 8 interventi live (2 feature + 4 sicurezza/privacy + 2 cleanup), tutte le VULN rituali chiuse, suite verde | sessione singola 2h21 | streak 3d"
+}
