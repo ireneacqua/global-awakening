@@ -43,7 +43,8 @@ async function seed() {
     bio: 'test', country: '', interests: [], telepathy_score: 0, telepathy_best: 0,
     show_telepathy_score: true }) });
   await sb('consciousness_posts', { method: 'POST', body: JSON.stringify({ author_nickname: NICK, content: 'post di test' }) });
-  await sb('private_messages', { method: 'POST', body: JSON.stringify({ sender_id: SID, sender_name: NICK, receiver_name: OTHER, content: 'ciao', is_read: false }) });
+  // private_messages: scrittura diretta bloccata da RLS (Step B) -> si usa la RPC autenticata.
+  await rpc('send_private_message', { p_sender_id: SID, p_sender_name: NICK, p_receiver_name: OTHER, p_content: 'ciao', p_sender_password_hash: HASH });
 }
 
 async function cleanup() {
@@ -51,6 +52,7 @@ async function cleanup() {
   await sb(`consciousness_posts?author_nickname=eq.${encodeURIComponent(NICK)}`, { method: 'DELETE' });
   await sb(`consciousness_posts?author_nickname=eq.${encodeURIComponent('Utente eliminato')}&content=eq.${encodeURIComponent('post di test')}`, { method: 'DELETE' });
   await sb(`private_messages?sender_name=eq.${encodeURIComponent(NICK)}`, { method: 'DELETE' });
+  await sb(`notifications?user_nickname=eq.${encodeURIComponent(OTHER)}`, { method: 'DELETE' });
 }
 
 (async () => {
