@@ -118,7 +118,9 @@ async function waitForResult(page, nickname) {
 async function waitAutoAdvance(page, timeout = TIMEOUT) {
   await Promise.any([
     page.waitForSelector('.symbol-btn', { state: 'visible', timeout }),
-    page.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { state: 'visible', timeout }),
+    // Al cambio-modalità (round 7,14,...) il picker è nascosto: appare il banner livello,
+    // diverso per chooser ("Choose the new mode") e passivo ("...is choosing...").
+    page.waitForSelector('text=/Choose the new mode|Scegli la nuova modalità|is choosing|sta scegliendo/i', { state: 'visible', timeout }),
   ]);
 }
 
@@ -495,29 +497,26 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     }
     if (!swapVerified) fail('Atteso swap dei ruoli al round 4, non rilevato');
 
-    // Dopo il 7° round + "Ancora" il banner deve essere visibile (showLevelBanner=true, showResult=false)
-    await Promise.all([
-      pageA.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
-      pageB.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
-    ]);
-    pass('Banner cambio livello apparso dopo 7 round');
+    // Al round 7: SOLO il chooser (A = user1) vede i bottoni; il passivo (B) vede l'attesa.
+    await pageA.waitForSelector('text=/Choose the new mode|Scegli la nuova modalità/', { timeout: TIMEOUT });
+    pass('Chooser (TestUserA) vede i bottoni di scelta modalità');
+    await pageB.waitForSelector('text=/is choosing|sta scegliendo/', { timeout: TIMEOUT });
+    pass('Passivo (TestUserB) vede "sta scegliendo la nuova modalità"');
+    const passiveBtns = await pageB.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).count();
+    if (passiveBtns === 0) pass('Passivo non ha i bottoni di scelta'); else fail('Passivo vede ancora i bottoni di scelta');
 
-    // Entrambi scelgono "Numeri"
-    await Promise.all([
-      pageA.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click(),
-      pageB.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click(),
-    ]);
-    log('TestUserA', 'Scelta: Numeri');
-    log('TestUserB', 'Scelta: Numeri');
+    // Il chooser sceglie Numeri (scelta unilaterale, si applica subito)
+    await pageA.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click();
+    log('TestUserA', 'Scelta (chooser): Numeri');
 
-    // Verifica che il livello sia cambiato a "Numeri"
-    // Dopo la scelta il banner scompare e si è direttamente in gioco (nessun "Ancora")
-    await pageA.waitForTimeout(3000); // attendi sync DB
-    const livelloText = await pageA.locator(':text("Numeri"), :text("Numbers")').count();
-    if (livelloText > 0) {
-      pass('Livello cambiato a "Numeri" con successo');
+    // Verifica modalità cambiata a Numeri per ENTRAMBI
+    await pageA.waitForTimeout(3000); // sync DB/poll
+    const levelA = await pageA.locator(':text("Numeri"), :text("Numbers")').count();
+    const levelB = await pageB.locator(':text("Numeri"), :text("Numbers")').count();
+    if (levelA > 0 && levelB > 0) {
+      pass('Modalità cambiata a Numeri per entrambi');
     } else {
-      fail('Livello NON cambiato a Numeri');
+      fail(`Modalità non cambiata a Numeri (A:${levelA} B:${levelB})`);
     }
 
     // ── Test 11b: roundCount sopravvive al cambio livello (#11) ─────────────
@@ -531,31 +530,18 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       fail(`roundCount resettato dopo cambio livello: visto ${roundCountAfter}, atteso 7`);
     }
 
-    // ── Test 12: Mismatch su cambio livello → disagreement (#6) ─────────────
-    console.log('\n📋 Test 12: Mismatch livello (RPC apply_level_change_if_both_agree)');
+    // ── Test 12: Alternanza chooser al round 14 + "Resta così" + passivo non bloccato ──
+    console.log('\n📋 Test 12: Alternanza chooser (round 14) + "Resta così"');
 
-    // Riporta entrambi in lobby
-    const xBtnEnd = pageA.locator(`button[aria-label="Termina Sessione"], button[aria-label="End Session"]`).first();
-    await xBtnEnd.click();
-    await pageA.locator('button:has-text("Esci"), button:has-text("Leave")').first().click();
-    await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
-    try {
-      await pageA.locator('button:has-text("Torna alla Lobby"), button:has-text("Back to Lobby")').click({ timeout: 5000 });
-    } catch { /* già in lobby */ }
-    await waitForLobby(pageA, 'TestUserA');
-    await waitForLobbyAfterPartnerLeft(pageB, 'TestUserB');
+    // Veniamo dal Test 11 nella STESSA sessione attiva: mode=Numeri, roundCount=7, chooser@7 = TestUserA.
+    // Nel cambio-modalità a turni il chooser è user1/user2 a seconda di levelChangeIndex=floor(round/7):
+    //   round 7  → index 1 (dispari) → chooser = user1 = TestUserA (verificato nel Test 11);
+    //   round 14 → index 2 (pari)    → chooser = user2 = TestUserB → l'alternanza che vogliamo testare.
+    // Per questo NON si fa un re-match (resetterebbe roundCount → di nuovo chooser=user1): si CONTINUA.
+    // (Random match: user1 = chi era già in coda = TestUserA, che clicca per primo — vedi app.html ~1680.)
 
-    // Re-match
-    await clickFindPartner(pageA, 'TestUserA');
-    await pageA.waitForTimeout(500);
-    await clickFindPartner(pageB, 'TestUserB');
-    await Promise.all([
-      waitForPartnerFound(pageA, 'TestUserA'),
-      waitForPartnerFound(pageB, 'TestUserB'),
-    ]);
-
-    // Gioca 7 round (ruoli role-aware: si alternano ogni 3 round) per far apparire il banner cambio livello
-    for (let i = 1; i <= 7; i++) {
+    // Gioca i round 8→14 (role-aware: i ruoli si alternano ogni 3 round)
+    for (let i = 8; i <= 14; i++) {
       const roleA = (await pageA.locator('p.text-white.font-bold').filter({ hasText: /^(Sender|Receiver|Mittente|Ricevitore)$/ }).first().textContent()).trim();
       const isSenderA = roleA === 'Sender' || roleA === 'Mittente';
       const sp = isSenderA ? pageA : pageB;
@@ -565,35 +551,51 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       await sendSymbol(sp, sName);
       await guessSymbol(rp, rName);
       await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
-      // Auto-avanzamento: attende il picker O il banner cambio-livello (no attesa fissa)
+      // Auto-avanzamento: per i round 8→13 riappare il picker; al round 14 appare invece il
+      // banner cambio-modalità (per il passivo A è "...sta scegliendo..."). waitAutoAdvance accetta entrambi.
       await waitAutoAdvance(pageA);
+      log('TestUserA', `Round ${i}/14 completato`);
     }
 
+    // Al round 14 il banner cambio-modalità appare su entrambi. Rileva DINAMICAMENTE i ruoli:
+    // il chooser vede levelChooseTitle, il passivo vede levelWaiting (preceduto dal nick del partner).
     await Promise.all([
-      pageA.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
-      pageB.waitForSelector(':text("Vuoi cambiare tipo di telepatia"), :text("Want to change telepathy mode")', { timeout: TIMEOUT }),
+      pageA.waitForSelector('text=/Choose the new mode|Scegli la nuova modalità|is choosing the new game mode|sta scegliendo la nuova modalità/i', { timeout: TIMEOUT }),
+      pageB.waitForSelector('text=/Choose the new mode|Scegli la nuova modalità|is choosing the new game mode|sta scegliendo la nuova modalità/i', { timeout: TIMEOUT }),
     ]);
-    pass('Banner cambio livello apparso (Test 12)');
+    const aIsChooser14 = (await pageA.locator('text=/Choose the new mode|Scegli la nuova modalità/').count()) > 0;
+    const bIsChooser14 = (await pageB.locator('text=/Choose the new mode|Scegli la nuova modalità/').count()) > 0;
 
-    // A clicca Numeri (1°), B clicca Parole (2° → vede mismatch via RPC)
-    await pageA.locator('button').filter({ hasText: /^(🔢 )?(Numeri|Numbers)$/ }).first().click();
-    log('TestUserA', 'Scelta: Numeri');
-    await pageA.waitForTimeout(500); // assicura che la RPC di A sia processata prima
-    await pageB.locator('button').filter({ hasText: /^(💬 )?(Parole|Words)$/ }).first().click();
-    log('TestUserB', 'Scelta: Parole');
-
-    // B (che ha cliccato 2° e visto il mismatch) vede il banner di disaccordo
-    await pageB.waitForSelector('text=/Avete scelto livelli diversi|Different choices/i', { timeout: 10000 });
-    pass('B vede banner disagreement (RPC ha rilevato mismatch)');
-
-    // A: il banner cambio livello deve essere dismissed dal polling, livello invariato (Forme/Shapes)
-    await pageA.waitForTimeout(3000); // attendi 1 ciclo di polling
-    const livelloDopoMismatch = await pageA.locator('span.text-white.text-sm.font-bold').filter({ hasText: /^(Forme|Shapes|Numeri|Numbers|Parole|Words)$/ }).first().textContent();
-    if (/^(Forme|Shapes)$/.test(livelloDopoMismatch.trim())) {
-      pass(`A: livello invariato dopo mismatch (= ${livelloDopoMismatch.trim()}) ✅`);
+    // Atteso: chooser ALTERNATO → ora TestUserB (user2), non più TestUserA (user1 al round 7).
+    if (bIsChooser14 && !aIsChooser14) {
+      pass('Chooser alternato al round 14 (ora TestUserB; era TestUserA al round 7) ✅');
     } else {
-      fail(`A: livello cambiato a "${livelloDopoMismatch}", atteso Forme/Shapes`);
+      fail(`Chooser NON alternato al round 14 (A chooser=${aIsChooser14}, B chooser=${bIsChooser14}; atteso solo B)`);
     }
+
+    // Il passivo (TestUserA) vede il messaggio di attesa e NON ha i bottoni di scelta.
+    const aWaiting14 = (await pageA.locator('text=/is choosing the new game mode|sta scegliendo la nuova modalità/').count()) > 0;
+    if (aWaiting14) pass('Passivo (TestUserA) vede "sta scegliendo la nuova modalità"');
+    else fail('Passivo (TestUserA) non vede il messaggio di attesa');
+    const passiveKeepBtn = await pageA.locator('button:has-text("Resta così"), button:has-text("Keep current")').count();
+    if (passiveKeepBtn === 0) pass('Passivo non ha i bottoni di scelta modalità');
+    else fail('Passivo vede ancora i bottoni di scelta modalità');
+
+    // Il chooser (TestUserB) sceglie "Resta così" (Keep current): la modalità non cambia, si applica subito.
+    await pageB.locator('button:has-text("Resta così"), button:has-text("Keep current")').first().click();
+    log('TestUserB', 'Scelta (chooser round 14): "Resta così"');
+
+    // Il passivo (TestUserA) deve SBLOCCARSI: pollLevelChange rileva il marcatore → dismette il banner
+    // e il gioco riprende (round 15). È il cuore del test: il passivo non resta appeso in attesa.
+    await pageA.waitForSelector('text=/is choosing the new game mode|sta scegliendo la nuova modalità/', { state: 'hidden', timeout: TIMEOUT });
+    pass('Passivo (TestUserA) sbloccato — banner attesa dismesso dopo la scelta del chooser ✅');
+    await pageA.waitForSelector('.symbol-btn', { state: 'visible', timeout: TIMEOUT });
+    pass('Il gioco riprende sul passivo (picker round 15 visibile)');
+
+    // "Resta così" mantiene la modalità precedente (Numeri, scelta al round 7).
+    const levelKept = await pageA.locator(':text("Numeri"), :text("Numbers")').count();
+    if (levelKept > 0) pass('"Resta così" mantiene la modalità Numeri');
+    else fail('Modalità cambiata dopo "Resta così" (atteso Numeri invariato)');
 
     // ── Test 13: Indicatore "training in corso" cross-tab (Batch C #3) ──────
     console.log('\n📋 Test 13: Indicatore training cross-tab (Batch C #3)');
