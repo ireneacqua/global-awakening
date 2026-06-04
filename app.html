@@ -4044,7 +4044,7 @@
                                 )
                               )}
 
-                              {effectiveRole === 'sender' && !waitingForPartner && (
+                              {!showLevelBanner && effectiveRole === 'sender' && !waitingForPartner && (
                                 <div>
                                   <p className="text-white text-center mb-4 font-medium">{t.telepathy.pickSymbol}</p>
                                   <div className="grid grid-cols-3 gap-4 mb-6">
@@ -4058,7 +4058,7 @@
                                 </div>
                               )}
 
-                              {effectiveRole === 'receiver' && !waitingForPartner && (
+                              {!showLevelBanner && effectiveRole === 'receiver' && !waitingForPartner && (
                                 <div>
                                   {senderHasSent ? (
                                     <p className="text-white text-center mb-4 font-medium">{t.telepathy.symbolSentGuess}</p>
@@ -4076,7 +4076,7 @@
                                 </div>
                               )}
 
-                              {waitingForPartner && (
+                              {!showLevelBanner && waitingForPartner && (
                                 <div className="text-center">
                                   <div style={{fontSize: '4rem'}} className="pulse-glow mb-4">🔮</div>
                                   <p className="text-primary">
