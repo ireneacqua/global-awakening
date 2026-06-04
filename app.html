@@ -4031,9 +4031,9 @@
                                   <div className="bg-glass-dark rounded-xl p-4" style={{border: '1px solid rgba(167,139,250,0.5)'}}>
                                     <p className="text-white font-bold text-center mb-3">{t.telepathy.levelChooseTitle}</p>
                                     <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                      <button onClick={() => proposeLevelChange('shapes')} className="btn-secondary" style={{flex: '1 1 45%', fontSize: '0.85rem'}}>🔷 {t.telepathy.levelShapes}</button>
-                                      <button onClick={() => proposeLevelChange('numbers')} className="btn-secondary" style={{flex: '1 1 45%', fontSize: '0.85rem'}}>🔢 {t.telepathy.levelNumbers}</button>
-                                      <button onClick={() => proposeLevelChange('words')} className="btn-secondary" style={{flex: '1 1 45%', fontSize: '0.85rem'}}>💬 {t.telepathy.levelWords}</button>
+                                      {[{m: 'shapes', ic: '🔷', lb: t.telepathy.levelShapes}, {m: 'numbers', ic: '🔢', lb: t.telepathy.levelNumbers}, {m: 'words', ic: '💬', lb: t.telepathy.levelWords}].filter(o => o.m !== currentLevel).map(o => (
+                                        <button key={o.m} onClick={() => proposeLevelChange(o.m)} className="btn-secondary" style={{flex: '1 1 45%', fontSize: '0.85rem'}}>{o.ic} {o.lb}</button>
+                                      ))}
                                       <button onClick={() => proposeLevelChange('keep')} className="btn-secondary" style={{flex: '1 1 45%', fontSize: '0.85rem'}}>{t.telepathy.levelKeep}</button>
                                     </div>
                                   </div>
