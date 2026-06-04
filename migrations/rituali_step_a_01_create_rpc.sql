@@ -132,9 +132,11 @@ GRANT EXECUTE ON FUNCTION create_ritual_comment(bigint,text,text) TO anon;
 -- ----------------------------------------------------------------------------
 -- 5) cleanup_expired_rituals — sostituisce il loop client-side
 -- ----------------------------------------------------------------------------
--- I rituali memorizzano date (date) e time (time without timezone) trattati
--- come UTC dal client (`new Date(`${r.date}T${r.time}Z`)`).
--- Endtime = (date + time) UTC + duration minuti.
+-- I rituali memorizzano date e time come TEXT (es. '2026-05-04', '15:25:00'),
+-- trattati come UTC dal client (`new Date(`${r.date}T${r.time}Z`)`).
+-- Vanno quindi castati (::date, ::time) prima dell'aritmetica, altrimenti
+-- `text + text` → errore 42883 "operator does not exist: text + text".
+-- Endtime = (date::date + time::time) UTC + duration minuti.
 --
 -- Ritorna il numero di rituali cancellati.
 CREATE OR REPLACE FUNCTION cleanup_expired_rituals()
@@ -146,7 +148,7 @@ DECLARE
 BEGIN
   WITH expired AS (
     DELETE FROM rituals
-     WHERE (date + time) + make_interval(mins => coalesce(duration, 0))
+     WHERE (date::date + time::time) + make_interval(mins => coalesce(duration, 0))
            < (now() AT TIME ZONE 'UTC')::timestamp
      RETURNING id
   )
