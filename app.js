@@ -3224,7 +3224,7 @@ function GlobalAwakeningPlatform() {
     }, loginSuccess)))), renderFooter(), renderPrivacyModal());
   }
   return React.createElement("div", {
-    className: "min-h-screen bg-gradient",
+    className: "min-h-screen bg-gradient app-shell",
     style: {
       paddingBottom: '3.5rem'
     }
@@ -3431,7 +3431,7 @@ function GlobalAwakeningPlatform() {
   }, onlineUsers.length), React.createElement("div", {
     className: "text-secondary text-xs"
   }, t.stats.onlineNow))))), React.createElement("div", {
-    className: "container",
+    className: "container main-nav-top",
     style: {
       paddingTop: '0.5rem'
     }
@@ -3468,7 +3468,37 @@ function GlobalAwakeningPlatform() {
       verticalAlign: 'middle'
     },
     "aria-hidden": "true"
-  }))))), React.createElement("div", {
+  }))))), React.createElement("nav", {
+    className: "main-nav-bottom",
+    "aria-label": "Sezioni principali"
+  }, ['rituals', 'telepathy', 'consciousness'].map(tab => React.createElement("button", {
+    key: tab,
+    onClick: () => setActiveTab(tab),
+    className: `nav-item ${activeTab === tab ? 'on' : ''}`,
+    "aria-current": activeTab === tab ? 'page' : undefined
+  }, React.createElement("span", {
+    className: "nav-ic",
+    "aria-hidden": "true"
+  }, {
+    rituals: '🕯️',
+    telepathy: '🔮',
+    consciousness: '🌌'
+  }[tab]), React.createElement("span", {
+    className: "nav-lb"
+  }, t.tabs[tab]), tab === 'telepathy' && partner && !sessionEnded && !partnerDisconnected && React.createElement("span", {
+    className: "training-badge pulse-glow",
+    style: {
+      position: 'absolute',
+      top: '7px',
+      right: 'calc(50% - 22px)',
+      width: '8px',
+      height: '8px',
+      background: '#a78bfa',
+      borderRadius: '50%',
+      boxShadow: '0 0 8px #a78bfa'
+    },
+    "aria-hidden": "true"
+  })))), React.createElement("div", {
     className: "container py-6"
   }, activeTab === 'rituals' && React.createElement("div", null, React.createElement("div", {
     className: "flex items-center justify-between mb-6"

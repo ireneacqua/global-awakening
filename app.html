@@ -346,7 +346,41 @@
             border: none;
         }
         .tab-inactive:hover { color: #fff; background: rgba(255,255,255,0.08); }
-        
+
+        /* ===== Navigazione principale: barra in basso su mobile ===== */
+        /* Desktop: resta la barra in alto (.main-nav-top); la barra in basso è nascosta. */
+        .main-nav-bottom { display: none; }
+        @media (max-width: 768px) {
+            .main-nav-top { display: none !important; }
+            .main-nav-bottom {
+                display: flex; gap: 0.4rem;
+                position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+                padding: 0.45rem 0.55rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+                /* colore DISTINTO dal contenuto sopra: ripiano viola-scuro + bordo acceso */
+                background: #1a1336;
+                border-top: 1px solid rgba(167,139,250,0.40);
+                box-shadow: 0 -6px 24px rgba(0,0,0,0.45);
+            }
+            .main-nav-bottom .nav-item {
+                flex: 1; display: flex; flex-direction: column; align-items: center;
+                justify-content: center; gap: 0.16rem; position: relative;
+                background: transparent; border: 1px solid transparent; color: #9ca3af;
+                border-radius: 0.8rem; padding: 0.35rem 0; min-height: 54px; cursor: pointer;
+                transition: all 0.15s;
+            }
+            .main-nav-bottom .nav-item .nav-ic { font-size: 1.5rem; line-height: 1; }
+            .main-nav-bottom .nav-item .nav-lb { font-size: 0.72rem; font-weight: 600; }
+            .main-nav-bottom .nav-item.on {
+                background: rgba(124,58,237,0.34); color: #fff;
+                border-color: rgba(167,139,250,0.55);
+            }
+            .main-nav-bottom .nav-item.on .nav-ic { filter: drop-shadow(0 0 6px rgba(167,139,250,0.85)); }
+            /* il footer non è più fisso: scorre in fondo, sopra la barra (niente sovrapposizione) */
+            .app-footer { position: static; background: transparent; backdrop-filter: none; }
+            /* spazio sotto al contenuto per non farlo coprire dalla barra fissa */
+            .app-shell { padding-bottom: 84px !important; }
+        }
+
         .symbol-btn {
             font-size: 3.75rem;
             padding: 1.5rem;

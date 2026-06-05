@@ -2827,7 +2827,7 @@
           }
 
           return (
-            <div className="min-h-screen bg-gradient" style={{paddingBottom: '3.5rem'}}>
+            <div className="min-h-screen bg-gradient app-shell" style={{paddingBottom: '3.5rem'}}>
               <header className="sticky top-0 bg-glass border-b z-50">
                 <div className="container">
                   <div className="header-inner flex items-center justify-between py-3">
@@ -2975,7 +2975,7 @@
                 </div>
               </div>
 
-              <div className="container" style={{paddingTop: '0.5rem'}}>
+              <div className="container main-nav-top" style={{paddingTop: '0.5rem'}}>
                 <div className="flex gap-2 bg-glass rounded-2xl p-3" style={{overflowX: 'auto'}}>
                   {['rituals', 'telepathy', 'consciousness'].map((tab) => (
                     <button
@@ -3007,6 +3007,19 @@
                   ))}
                 </div>
               </div>
+
+              {/* Navigazione principale in basso — visibile solo su mobile (via CSS .main-nav-bottom) */}
+              <nav className="main-nav-bottom" aria-label="Sezioni principali">
+                {['rituals', 'telepathy', 'consciousness'].map((tab) => (
+                  <button key={tab} onClick={() => setActiveTab(tab)} className={`nav-item ${activeTab === tab ? 'on' : ''}`} aria-current={activeTab === tab ? 'page' : undefined}>
+                    <span className="nav-ic" aria-hidden="true">{ {rituals: '🕯️', telepathy: '🔮', consciousness: '🌌'}[tab] }</span>
+                    <span className="nav-lb">{t.tabs[tab]}</span>
+                    {tab === 'telepathy' && partner && !sessionEnded && !partnerDisconnected && (
+                      <span className="training-badge pulse-glow" style={{position: 'absolute', top: '7px', right: 'calc(50% - 22px)', width: '8px', height: '8px', background: '#a78bfa', borderRadius: '50%', boxShadow: '0 0 8px #a78bfa'}} aria-hidden="true" />
+                    )}
+                  </button>
+                ))}
+              </nav>
 
               <div className="container py-6">
                 {activeTab === 'rituals' && (
