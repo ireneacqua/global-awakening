@@ -125,8 +125,13 @@ async function waitAutoAdvance(page, timeout = TIMEOUT) {
 }
 
 async function clickTerminaSessione(page, nickname) {
-  await page.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
-  log(nickname, `Cliccato "Termina Sessione"`);
+  // Usa la X sempre presente (aria-label) + conferma modale, NON il bottone testuale
+  // della schermata risultato: quello esiste solo durante showResult e l'auto-avanzamento
+  // lo rimuove dopo ~4.5s (showResult→false), causando click-timeout intermittenti.
+  // La X (app.html:3987) è visibile per tutta la sessione (partner && !sessionEnded) → race-free.
+  await page.locator('button[aria-label="Termina Sessione"], button[aria-label="End Session"]').first().click();
+  await page.locator('button:has-text("Esci"), button:has-text("Leave")').first().click();
+  log(nickname, `Cliccato "Termina Sessione" (X + conferma)`);
 }
 
 async function waitForLobby(page, nickname) {
@@ -396,7 +401,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
       await sendSymbol(isSenderA2 ? pageA : pageB, 'S2');
       await guessSymbol(isSenderA2 ? pageB : pageA, 'R2');
       await Promise.all([waitForResult(pageA, 'TestUserA'), waitForResult(pageB, 'TestUserB')]);
-      await pageA.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
+      await clickTerminaSessione(pageA, 'TestUserA');
       await Promise.all([
         pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT }),
         waitForLobbyAfterPartnerLeft(pageB, 'TestUserB'),
@@ -440,7 +445,7 @@ async function waitForLobbyAfterPartnerLeft(page, nickname) {
     await sendSymbol(sp3, 'S3');
     await guessSymbol(rp3, 'R3');
     await waitForResult(pageA, 'TestUserA');
-    await pageA.locator('button:has-text("Termina Sessione"), button:has-text("End Session")').first().click();
+    await clickTerminaSessione(pageA, 'TestUserA');
     await pageA.waitForSelector('text=/Sessione Completata|Session Complete/', { timeout: TIMEOUT });
 
     // Controlla Supabase via fetch
