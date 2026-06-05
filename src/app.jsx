@@ -345,7 +345,7 @@
               pickSymbol: "Pick the symbol to send:",
               sendTelepathically: "Send Telepathically",
               symbolSentGuess: "✨ Symbol sent! Which one do you receive?",
-              waitingForSend: "Waiting for the symbol... you can already pick.",
+              waitingForSend: "is choosing the symbol… wait for it to light up",
               confirm: "Confirm",
               senderWaiting: "Symbol sent! Waiting for the receiver to guess...",
               receiverWaiting: "Answer sent! Waiting for the sender...",
@@ -634,7 +634,7 @@
               pickSymbol: "Scegli il simbolo da inviare:",
               sendTelepathically: "Invia Telepaticamente",
               symbolSentGuess: "✨ Simbolo inviato! Quale ricevi?",
-              waitingForSend: "In attesa dell'invio... puoi gia' scegliere.",
+              waitingForSend: "sta scegliendo il simbolo… aspetta che si accenda",
               confirm: "Conferma",
               senderWaiting: "Simbolo inviato! In attesa che il ricevitore indovini...",
               receiverWaiting: "Risposta inviata! In attesa del mittente...",
@@ -746,6 +746,14 @@
           const [partnerDisconnected, setPartnerDisconnected] = useState(false); // partner ha chiuso il tab
           const [onlineUsersForTelepathy, setOnlineUsersForTelepathy] = useState([]); // utenti con status
           const [senderHasSent, setSenderHasSent] = useState(false);
+          // Riepilogo round: "congelo" ruolo+livello del round risolto, perché roundCount
+          // incrementa al risultato e effectiveRole si INVERTE ogni 3 round → leggere il
+          // ruolo live nel recap mostrava il simbolo sbagliato/nullo (bug "icona vuota").
+          const [resultRole, setResultRole] = useState(null);
+          const [resultLevel, setResultLevel] = useState(null);
+          // Overlay centrale "ruoli invertiti" (auto-dismiss); chat sessione richiudibile su mobile.
+          const [roleSwapOverlay, setRoleSwapOverlay] = useState(null); // null | 'sender' | 'receiver'
+          const [telepathyChatOpen, setTelepathyChatOpen] = useState(false);
           const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
           const [newTelepathyMessage, setNewTelepathyMessage] = useState('');
           // Batch C #3 — tab nascosto (utente passato a altro tab del browser)
@@ -1736,6 +1744,10 @@
                 setIsMatch(isTelepathicMatch);
                 setShowResult(true);
                 setWaitingForPartner(false);
+                // Congela ruolo+livello PRIMA dell'incremento di roundCount (che inverte
+                // effectiveRole ogni 3 round): il recap userà questi, non i valori live.
+                setResultRole(effectiveRole);
+                setResultLevel(currentLevel);
 
                 const newRound = (match.round_count || 0) + 1;
                 const newSessionMatches = sessionMatchesRef.current + (isTelepathicMatch ? 1 : 0);
@@ -1773,6 +1785,17 @@
             const interval = setInterval(pollResult, 2000);
             return () => clearInterval(interval);
           }, [matchId, waitingForPartner, role, effectiveRole, currentLevel]);
+
+          // Overlay centrale "ruoli invertiti": all'inizio di un round multiplo di 3 (4°,7°,…)
+          // i ruoli si scambiano → avviso grosso al centro schermo per ~2,2s (o tap per chiudere).
+          useEffect(() => {
+            if (partner && !sessionEnded && roundCount > 0 && roundCount % 3 === 0) {
+              setRoleSwapOverlay(effectiveRole);
+              const tmr = setTimeout(() => setRoleSwapOverlay(null), 2200);
+              return () => clearTimeout(tmr);
+            }
+            setRoleSwapOverlay(null);
+          }, [roundCount, partner, sessionEnded, effectiveRole]);
 
           // Rileva se il partner ha abbandonato la sessione:
           // 1. match eliminato (ha cliccato Termina o chiusura tab con sendBeacon)
@@ -3344,7 +3367,7 @@
 
                 {activeTab === 'telepathy' && (
                   <div className="bg-glass rounded-2xl p-6 border-glass">
-                    <div className="text-center mb-6">
+                    <div className={`text-center mb-6 ${(partner || sessionEnded) ? 'tele-header-insession' : ''}`}>
                       <Brain style={{width: '4rem', height: '4rem', margin: '0 auto 1rem', color: '#a78bfa'}} />
                       <h2 className="text-3xl font-bold text-white mb-2">{t.telepathy.title}</h2>
                       <p className="text-primary">{t.telepathy.subtitle}</p>
@@ -3438,7 +3461,7 @@
                     )}
 
                     {(partner || sessionEnded) && (
-                      <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start', position: 'relative'}}>
+                      <div className="tele-session" style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start', position: 'relative'}}>
                         {partner && !sessionEnded && (
                           <button
                             onClick={() => setShowEndSessionConfirm(true)}
@@ -3470,14 +3493,8 @@
                           </div>
                         )}
 
-                        {partner && !sessionEnded && !showResult && roundCount > 0 && roundCount % 3 === 0 && (
-                          <div role="status" className="pulse-glow" style={{width: '100%', background: 'rgba(167,139,250,0.32)', border: '2px solid rgba(167,139,250,0.85)', borderRadius: '0.85rem', padding: '1rem 1.1rem', marginBottom: '0.6rem', color: '#fff', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center', boxShadow: '0 0 18px rgba(167,139,250,0.45)'}}>
-                            {effectiveRole === 'sender' ? t.telepathy.roleSwappedSender : t.telepathy.roleSwappedReceiver}
-                          </div>
-                        )}
-
                         {/* SINISTRA: riepilogo sessione + status partner */}
-                        <div style={{flex: '0 0 180px', minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+                        <div className="tele-col tele-col-info" style={{flex: '0 0 180px', minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
                           <div className="bg-glass-dark rounded-xl p-4">
                             <p className="text-secondary text-xs mb-1">{t.telepathy.partner}</p>
                             <p className="text-white font-bold">{partner?.nickname}</p>
@@ -3507,7 +3524,7 @@
                         </div>
 
                         {/* CENTRO: area di gioco */}
-                        <div style={{flex: '1 1 280px', minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                        <div className="tele-col tele-col-game" style={{flex: '1 1 280px', minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                           {partner && !sessionEnded && (
                             <div
                               className={`bg-glass-dark rounded-xl ${isMyTurn() ? 'pulse-glow' : ''}`}
@@ -3569,16 +3586,16 @@
                                   {senderHasSent ? (
                                     <p className="text-white text-center mb-4 font-medium">{t.telepathy.symbolSentGuess}</p>
                                   ) : (
-                                    <p className="text-white text-center mb-4 font-medium">{t.telepathy.waitingForSend}</p>
+                                    <p className="text-primary text-center mb-4 font-medium">⏳ {partner?.nickname} {t.telepathy.waitingForSend}</p>
                                   )}
-                                  <div className="grid grid-cols-3 gap-4 mb-6">
+                                  <div className={`grid grid-cols-3 gap-4 mb-6 ${!senderHasSent ? 'symbols-locked' : ''}`}>
                                     {getCurrentSymbols(currentLevel).map((symbol) => (
-                                      <button key={symbol.id} onClick={() => setGuessedSymbol(symbol.id)} className={`symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}>
+                                      <button key={symbol.id} disabled={!senderHasSent} onClick={() => setGuessedSymbol(symbol.id)} className={`symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`}>
                                         {symbol.icon}
                                       </button>
                                     ))}
                                   </div>
-                                  <button onClick={submitGuess} disabled={!guessedSymbol} className="btn-primary w-full">{t.telepathy.confirm}</button>
+                                  <button onClick={submitGuess} disabled={!guessedSymbol || !senderHasSent} className="btn-primary w-full">{t.telepathy.confirm}</button>
                                 </div>
                               )}
 
@@ -3603,11 +3620,11 @@
                                 <div className="flex justify-center gap-6 mb-3" style={{marginTop: '0.5rem'}}>
                                   <div className="text-center">
                                     <p className="text-secondary text-sm mb-1">{t.telepathy.sentLabel}</p>
-                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(currentLevel).find(s => s.id === (effectiveRole === 'sender' ? selectedSymbol : partnerSymbol))?.icon}</span>
+                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(resultLevel || currentLevel).find(s => s.id === ((resultRole || effectiveRole) === 'sender' ? selectedSymbol : partnerSymbol))?.icon || '·'}</span>
                                   </div>
                                   <div className="text-center">
                                     <p className="text-secondary text-sm mb-1">{t.telepathy.guessedLabel}</p>
-                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(currentLevel).find(s => s.id === (effectiveRole === 'receiver' ? guessedSymbol : partnerSymbol))?.icon}</span>
+                                    <span style={{fontSize: '2.5rem'}}>{getCurrentSymbols(resultLevel || currentLevel).find(s => s.id === ((resultRole || effectiveRole) === 'receiver' ? guessedSymbol : partnerSymbol))?.icon || '·'}</span>
                                   </div>
                                 </div>
                                 {isMatch && <p className="text-white">{t.telepathy.resonance}</p>}
@@ -3643,9 +3660,12 @@
 
                         {/* DESTRA: chat con il partner */}
                         {partner && !sessionEnded && (
-                          <div style={{flex: '0 0 200px', minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                          <div className={`tele-col tele-col-chat ${telepathyChatOpen ? 'chat-open' : ''}`} style={{flex: '0 0 200px', minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                             <div className="bg-glass-dark rounded-xl p-3">
-                              <p className="text-white text-sm font-bold mb-2">💬 {t.telepathy.chatWith} {partner.nickname}</p>
+                              <div className="tele-chat-header text-white text-sm font-bold mb-2" onClick={() => setTelepathyChatOpen(o => !o)} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer'}}>
+                                <span>💬 {t.telepathy.chatWith} {partner.nickname}</span>
+                                <span className="tele-chat-chevron text-secondary" aria-hidden="true" style={{fontSize: '0.75rem'}}>{telepathyChatOpen ? '▾' : '▸'}</span>
+                              </div>
                               <div style={{height: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem'}}>
                                 {telepathyChatMessages.length === 0 && (
                                   <p className="text-secondary text-xs text-center" style={{marginTop: '2rem'}}>{t.telepathy.noMessages}</p>
@@ -4130,6 +4150,14 @@
                   <p className="text-white" style={{margin: 0, fontSize: '0.9rem', lineHeight: 1.35}}>
                     🔮 {t.telepathy.trainingFloatingPrefix} <strong>{partner.nickname}</strong> — {t.telepathy.trainingFloatingCta}
                   </p>
+                </div>
+              )}
+
+              {roleSwapOverlay && (
+                <div className="role-swap-overlay" onClick={() => setRoleSwapOverlay(null)}>
+                  <div className="role-swap-card">
+                    <p className="role-swap-text">{roleSwapOverlay === 'sender' ? t.telepathy.roleSwappedSender : t.telepathy.roleSwappedReceiver}</p>
+                  </div>
                 </div>
               )}
 

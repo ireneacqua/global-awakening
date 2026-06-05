@@ -511,7 +511,7 @@ const translations = {
       pickSymbol: "Pick the symbol to send:",
       sendTelepathically: "Send Telepathically",
       symbolSentGuess: "✨ Symbol sent! Which one do you receive?",
-      waitingForSend: "Waiting for the symbol... you can already pick.",
+      waitingForSend: "is choosing the symbol… wait for it to light up",
       confirm: "Confirm",
       senderWaiting: "Symbol sent! Waiting for the receiver to guess...",
       receiverWaiting: "Answer sent! Waiting for the sender...",
@@ -817,7 +817,7 @@ const translations = {
       pickSymbol: "Scegli il simbolo da inviare:",
       sendTelepathically: "Invia Telepaticamente",
       symbolSentGuess: "✨ Simbolo inviato! Quale ricevi?",
-      waitingForSend: "In attesa dell'invio... puoi gia' scegliere.",
+      waitingForSend: "sta scegliendo il simbolo… aspetta che si accenda",
       confirm: "Conferma",
       senderWaiting: "Simbolo inviato! In attesa che il ricevitore indovini...",
       receiverWaiting: "Risposta inviata! In attesa del mittente...",
@@ -924,6 +924,10 @@ function GlobalAwakeningPlatform() {
   const [partnerDisconnected, setPartnerDisconnected] = useState(false);
   const [onlineUsersForTelepathy, setOnlineUsersForTelepathy] = useState([]);
   const [senderHasSent, setSenderHasSent] = useState(false);
+  const [resultRole, setResultRole] = useState(null);
+  const [resultLevel, setResultLevel] = useState(null);
+  const [roleSwapOverlay, setRoleSwapOverlay] = useState(null);
+  const [telepathyChatOpen, setTelepathyChatOpen] = useState(false);
   const [telepathyChatMessages, setTelepathyChatMessages] = useState([]);
   const [newTelepathyMessage, setNewTelepathyMessage] = useState('');
   const [isTabHidden, setIsTabHidden] = useState(typeof document !== 'undefined' && document.hidden);
@@ -1989,6 +1993,8 @@ function GlobalAwakeningPlatform() {
         setIsMatch(isTelepathicMatch);
         setShowResult(true);
         setWaitingForPartner(false);
+        setResultRole(effectiveRole);
+        setResultLevel(currentLevel);
         const newRound = (match.round_count || 0) + 1;
         const newSessionMatches = sessionMatchesRef.current + (isTelepathicMatch ? 1 : 0);
         setRoundCount(newRound);
@@ -2011,6 +2017,14 @@ function GlobalAwakeningPlatform() {
     const interval = setInterval(pollResult, 2000);
     return () => clearInterval(interval);
   }, [matchId, waitingForPartner, role, effectiveRole, currentLevel]);
+  useEffect(() => {
+    if (partner && !sessionEnded && roundCount > 0 && roundCount % 3 === 0) {
+      setRoleSwapOverlay(effectiveRole);
+      const tmr = setTimeout(() => setRoleSwapOverlay(null), 2200);
+      return () => clearTimeout(tmr);
+    }
+    setRoleSwapOverlay(null);
+  }, [roundCount, partner, sessionEnded, effectiveRole]);
   useEffect(() => {
     if (!matchId) return;
     const checkPartnerLeft = async () => {
@@ -3954,7 +3968,7 @@ function GlobalAwakeningPlatform() {
   }))))))), activeTab === 'telepathy' && React.createElement("div", {
     className: "bg-glass rounded-2xl p-6 border-glass"
   }, React.createElement("div", {
-    className: "text-center mb-6"
+    className: `text-center mb-6 ${partner || sessionEnded ? 'tele-header-insession' : ''}`
   }, React.createElement(Brain, {
     style: {
       width: '4rem',
@@ -4146,6 +4160,7 @@ function GlobalAwakeningPlatform() {
     onClick: () => setSearchingPartner(false),
     className: "btn-secondary"
   }, t.telepathy.cancel)), (partner || sessionEnded) && React.createElement("div", {
+    className: "tele-session",
     style: {
       display: 'flex',
       gap: '1rem',
@@ -4193,23 +4208,8 @@ function GlobalAwakeningPlatform() {
   }, partner?.nickname || t.telepathy.yourPartnerFallback, " ", t.telepathy.partnerLeftSuffix), React.createElement("button", {
     onClick: resetTelepathy,
     className: "btn-primary"
-  }, t.telepathy.backToLobby)), partner && !sessionEnded && !showResult && roundCount > 0 && roundCount % 3 === 0 && React.createElement("div", {
-    role: "status",
-    className: "pulse-glow",
-    style: {
-      width: '100%',
-      background: 'rgba(167,139,250,0.32)',
-      border: '2px solid rgba(167,139,250,0.85)',
-      borderRadius: '0.85rem',
-      padding: '1rem 1.1rem',
-      marginBottom: '0.6rem',
-      color: '#fff',
-      fontSize: '1.1rem',
-      fontWeight: 700,
-      textAlign: 'center',
-      boxShadow: '0 0 18px rgba(167,139,250,0.45)'
-    }
-  }, effectiveRole === 'sender' ? t.telepathy.roleSwappedSender : t.telepathy.roleSwappedReceiver), React.createElement("div", {
+  }, t.telepathy.backToLobby)), React.createElement("div", {
+    className: "tele-col tele-col-info",
     style: {
       flex: '0 0 180px',
       minWidth: '160px',
@@ -4274,6 +4274,7 @@ function GlobalAwakeningPlatform() {
       color: '#4ade80'
     }
   }, Math.round(sessionMatches / roundCount * 100), "%")))), React.createElement("div", {
+    className: "tele-col tele-col-game",
     style: {
       flex: '1 1 280px',
       minWidth: '260px',
@@ -4376,16 +4377,17 @@ function GlobalAwakeningPlatform() {
   }, t.telepathy.sendTelepathically)), !showLevelBanner && effectiveRole === 'receiver' && !waitingForPartner && React.createElement("div", null, senderHasSent ? React.createElement("p", {
     className: "text-white text-center mb-4 font-medium"
   }, t.telepathy.symbolSentGuess) : React.createElement("p", {
-    className: "text-white text-center mb-4 font-medium"
-  }, t.telepathy.waitingForSend), React.createElement("div", {
-    className: "grid grid-cols-3 gap-4 mb-6"
+    className: "text-primary text-center mb-4 font-medium"
+  }, "\u23F3 ", partner?.nickname, " ", t.telepathy.waitingForSend), React.createElement("div", {
+    className: `grid grid-cols-3 gap-4 mb-6 ${!senderHasSent ? 'symbols-locked' : ''}`
   }, getCurrentSymbols(currentLevel).map(symbol => React.createElement("button", {
     key: symbol.id,
+    disabled: !senderHasSent,
     onClick: () => setGuessedSymbol(symbol.id),
     className: `symbol-btn ${guessedSymbol === symbol.id ? 'symbol-btn-selected' : ''}`
   }, symbol.icon))), React.createElement("button", {
     onClick: submitGuess,
-    disabled: !guessedSymbol,
+    disabled: !guessedSymbol || !senderHasSent,
     className: "btn-primary w-full"
   }, t.telepathy.confirm)), !showLevelBanner && waitingForPartner && React.createElement("div", {
     className: "text-center"
@@ -4427,7 +4429,7 @@ function GlobalAwakeningPlatform() {
     style: {
       fontSize: '2.5rem'
     }
-  }, getCurrentSymbols(currentLevel).find(s => s.id === (effectiveRole === 'sender' ? selectedSymbol : partnerSymbol))?.icon)), React.createElement("div", {
+  }, getCurrentSymbols(resultLevel || currentLevel).find(s => s.id === ((resultRole || effectiveRole) === 'sender' ? selectedSymbol : partnerSymbol))?.icon || '·')), React.createElement("div", {
     className: "text-center"
   }, React.createElement("p", {
     className: "text-secondary text-sm mb-1"
@@ -4435,7 +4437,7 @@ function GlobalAwakeningPlatform() {
     style: {
       fontSize: '2.5rem'
     }
-  }, getCurrentSymbols(currentLevel).find(s => s.id === (effectiveRole === 'receiver' ? guessedSymbol : partnerSymbol))?.icon))), isMatch && React.createElement("p", {
+  }, getCurrentSymbols(resultLevel || currentLevel).find(s => s.id === ((resultRole || effectiveRole) === 'receiver' ? guessedSymbol : partnerSymbol))?.icon || '·'))), isMatch && React.createElement("p", {
     className: "text-white"
   }, t.telepathy.resonance)), !showLevelBanner && React.createElement("div", {
     style: {
@@ -4505,6 +4507,7 @@ function GlobalAwakeningPlatform() {
     onClick: resetTelepathy,
     className: "btn-secondary w-full"
   }, t.telepathy.backToLobbyCap)))), partner && !sessionEnded && React.createElement("div", {
+    className: `tele-col tele-col-chat ${telepathyChatOpen ? 'chat-open' : ''}`,
     style: {
       flex: '0 0 200px',
       minWidth: '180px',
@@ -4514,9 +4517,22 @@ function GlobalAwakeningPlatform() {
     }
   }, React.createElement("div", {
     className: "bg-glass-dark rounded-xl p-3"
-  }, React.createElement("p", {
-    className: "text-white text-sm font-bold mb-2"
-  }, "\uD83D\uDCAC ", t.telepathy.chatWith, " ", partner.nickname), React.createElement("div", {
+  }, React.createElement("div", {
+    className: "tele-chat-header text-white text-sm font-bold mb-2",
+    onClick: () => setTelepathyChatOpen(o => !o),
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      cursor: 'pointer'
+    }
+  }, React.createElement("span", null, "\uD83D\uDCAC ", t.telepathy.chatWith, " ", partner.nickname), React.createElement("span", {
+    className: "tele-chat-chevron text-secondary",
+    "aria-hidden": "true",
+    style: {
+      fontSize: '0.75rem'
+    }
+  }, telepathyChatOpen ? '▾' : '▸')), React.createElement("div", {
     style: {
       height: '220px',
       overflowY: 'auto',
@@ -5220,7 +5236,14 @@ function GlobalAwakeningPlatform() {
       fontSize: '0.9rem',
       lineHeight: 1.35
     }
-  }, "\uD83D\uDD2E ", t.telepathy.trainingFloatingPrefix, " ", React.createElement("strong", null, partner.nickname), " \u2014 ", t.telepathy.trainingFloatingCta)), showEndSessionConfirm && React.createElement("div", {
+  }, "\uD83D\uDD2E ", t.telepathy.trainingFloatingPrefix, " ", React.createElement("strong", null, partner.nickname), " \u2014 ", t.telepathy.trainingFloatingCta)), roleSwapOverlay && React.createElement("div", {
+    className: "role-swap-overlay",
+    onClick: () => setRoleSwapOverlay(null)
+  }, React.createElement("div", {
+    className: "role-swap-card"
+  }, React.createElement("p", {
+    className: "role-swap-text"
+  }, roleSwapOverlay === 'sender' ? t.telepathy.roleSwappedSender : t.telepathy.roleSwappedReceiver))), showEndSessionConfirm && React.createElement("div", {
     className: "modal-overlay",
     onClick: () => setShowEndSessionConfirm(false)
   }, React.createElement("div", {

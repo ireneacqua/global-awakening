@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'sha256-NwHmHfqxALuQcS60/W6pn3jpYZiaiG22vhXvRbXNTBY=' 'sha256-oQJsl5MD2Xv3eiKO/zyYqIDcY8DSAVh/ntmjmESjD08=' 'sha256-YvDVK8975O3rgdbaaDXOJNFq1lKf6tn2kN0TxW0gRTg=' 'sha256-+lkC65UmaxvBpvpF7uoEo5jEpVV5EigGnD0bRriQ4QY='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://vxzxdkcluyrcftsnxxza.supabase.co https://api.emailjs.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'sha256-NwHmHfqxALuQcS60/W6pn3jpYZiaiG22vhXvRbXNTBY=' 'sha256-oQJsl5MD2Xv3eiKO/zyYqIDcY8DSAVh/ntmjmESjD08=' 'sha256-YvDVK8975O3rgdbaaDXOJNFq1lKf6tn2kN0TxW0gRTg=' 'sha256-/yTpcP467wZJLHMH/w3egcUk8bVn9ze6PwuUPeF0hFw='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://vxzxdkcluyrcftsnxxza.supabase.co https://api.emailjs.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; object-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Awakening Platform</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭐</text></svg>">
@@ -381,6 +381,46 @@
             .app-shell { padding-bottom: 84px !important; }
         }
 
+        /* ===== Sessione telepatia: simboli bloccati finché il sender non invia ===== */
+        .symbols-locked { opacity: 0.3; filter: grayscale(1); pointer-events: none; }
+
+        /* ===== Overlay centrale "ruoli invertiti" (auto-dismiss ~2,2s, tap per chiudere) ===== */
+        .role-swap-overlay {
+            position: fixed; inset: 0; z-index: 9997;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(7,6,12,0.55); backdrop-filter: blur(2px);
+            animation: rso-fade 0.25s ease-out; cursor: pointer; padding: 1rem;
+        }
+        .role-swap-card {
+            background: linear-gradient(135deg, rgba(124,58,237,0.96) 0%, rgba(167,139,250,0.94) 100%);
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 1.2rem;
+            padding: 1.8rem 2rem; text-align: center; max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(124,58,237,0.6), 0 0 40px rgba(167,139,250,0.5);
+            animation: rso-pop 0.35s cubic-bezier(.2,1.4,.4,1);
+        }
+        .role-swap-text { color: #fff; font-size: 1.45rem; font-weight: 800; margin: 0; line-height: 1.25; }
+        @keyframes rso-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes rso-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+
+        /* ===== Sessione telepatia su mobile: azione prima, info compatta, chat richiudibile ===== */
+        .tele-chat-chevron { display: none; }
+        @media (max-width: 768px) {
+            .tele-session { flex-direction: column; }
+            .tele-col { flex: 1 1 auto !important; min-width: 0 !important; width: 100%; }
+            .tele-col-game { order: 1; }
+            .tele-col-info { order: 2; }
+            .tele-col-chat { order: 3; }
+            /* info compatta: le due card affiancate, padding ridotto */
+            .tele-col-info { flex-direction: row !important; gap: 0.5rem; }
+            .tele-col-info > div { flex: 1; padding: 0.6rem !important; }
+            /* chat richiudibile: nascondi tutto tranne l'header finché non è aperta */
+            .tele-chat-chevron { display: inline; }
+            .tele-col-chat:not(.chat-open) .tele-chat-header { margin-bottom: 0; }
+            .tele-col-chat:not(.chat-open) .tele-chat-header ~ * { display: none; }
+            /* in sessione su mobile, nascondi il titolone per dare spazio all'azione */
+            .tele-header-insession { display: none; }
+        }
+
         .symbol-btn {
             font-size: 3.75rem;
             padding: 1.5rem;
@@ -525,66 +565,71 @@
 <canvas id="starfield" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;"></canvas>
 <script>
 (function() {
+  // Starfield "warp": stelle in prospettiva 3D che sfrecciano dal centro verso i bordi,
+  // come viaggiando nello spazio. Leggero (~180 stelle, requestAnimationFrame), in pausa
+  // quando l'app è in background, e quasi statico se l'utente preferisce ridurre le animazioni.
   const canvas = document.getElementById('starfield');
   const ctx = canvas.getContext('2d');
-
-  // Colore di sfondo quasi nero con lieve tinta blu-verde (come nel riferimento)
   const BG = '#0c0f14';
+  const STAR_COUNT = 180;
+  const MAX_Z = 1000;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SPEED = reduce ? 0.5 : 6; // velocità di avvicinamento
 
-  const STAR_COUNT = 220;
-  let stars = [];
-  let W, H;
+  let W, H, cx, cy, focal, stars = [], running = false, rafId = null;
 
   function resize() {
-    W = canvas.width  = window.innerWidth;
+    W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
+    cx = W / 2; cy = H / 2;
+    focal = Math.max(W, H) * 0.8;
+  }
+
+  function place(s, deep) {
+    s.x = (Math.random() * 2 - 1) * W;
+    s.y = (Math.random() * 2 - 1) * H;
+    s.z = deep ? MAX_Z : Math.random() * MAX_Z;
+    s.pz = s.z;
+    s.col = Math.random() < 0.12 ? '180, 220, 240' : '255, 255, 255';
   }
 
   function initStars() {
     stars = [];
-    for (let i = 0; i < STAR_COUNT; i++) {
-      const r = Math.random();
-      // 80% piccole (0.5-1.2px), 15% medie (1.5-2.5px), 5% grandi (3-4px)
-      const size = r < 0.80 ? 0.5 + Math.random() * 0.7
-                 : r < 0.95 ? 1.5 + Math.random() * 1.0
-                 :             3.0 + Math.random() * 1.0;
-      const brightness = 0.4 + Math.random() * 0.6;
-      stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        size,
-        brightness,
-        twinkleSpeed: 0.002 + Math.random() * 0.006,
-        twinkleOffset: Math.random() * Math.PI * 2,
-      });
-    }
+    for (let i = 0; i < STAR_COUNT; i++) { const s = {}; place(s, false); stars.push(s); }
   }
 
-  function draw(t) {
+  function draw() {
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, W, H);
-
     for (const s of stars) {
-      const flicker = 0.75 + 0.25 * Math.sin(t * s.twinkleSpeed + s.twinkleOffset);
-      const alpha = s.brightness * flicker;
+      s.pz = s.z;
+      s.z -= SPEED;
+      if (s.z < 1) { place(s, true); }
+      const sx = cx + (s.x / s.z) * focal;
+      const sy = cy + (s.y / s.z) * focal;
+      if (sx < 0 || sx > W || sy < 0 || sy > H) { place(s, true); continue; }
+      const px = cx + (s.x / s.pz) * focal;
+      const py = cy + (s.y / s.pz) * focal;
+      const k = 1 - s.z / MAX_Z;            // 0 lontano → 1 vicino
+      const alpha = Math.min(1, 0.2 + k * 0.9);
+      ctx.strokeStyle = `rgba(${s.col}, ${alpha})`;
+      ctx.lineWidth = Math.max(0.4, k * 2.4);
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-      // Stelle grandi: sfumatura leggermente azzurrina (come nel riferimento)
-      if (s.size > 2) {
-        ctx.fillStyle = `rgba(180, 220, 240, ${alpha})`;
-      } else {
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-      }
-      ctx.fill();
+      ctx.moveTo(px, py);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
     }
-
-    requestAnimationFrame(draw);
+    if (running) rafId = requestAnimationFrame(draw);
   }
 
+  function start() { if (!running) { running = true; rafId = requestAnimationFrame(draw); } }
+  function stop() { running = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+
+  document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
   window.addEventListener('resize', () => { resize(); initStars(); });
   resize();
   initStars();
-  requestAnimationFrame(draw);
+  start();
 })();
 </script>
     <div id="root"></div>
