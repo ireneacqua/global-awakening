@@ -1,7 +1,7 @@
 // Service worker PWA Global Awakening.
 // Strategia: network-first per navigazione/app.html/app.js (aggiornamenti sempre freschi,
 // cache solo come fallback offline), cache-first per CDN immutabili e icone, no-cache per Supabase/EmailJS.
-const CACHE = 'ga-pwa-v3';
+const CACHE = 'ga-pwa-v4';
 const PRECACHE = [
   'app.html', 'app.js', 'index.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
@@ -14,7 +14,8 @@ self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
     // add singolo + allSettled: se un CDN non risponde non fa fallire tutto il precache.
-    await Promise.allSettled(PRECACHE.map((u) => c.add(u)));
+    // cache:'reload' bypassa la cache HTTP del browser → icone/app sempre fresche al bump versione.
+    await Promise.allSettled(PRECACHE.map((u) => c.add(new Request(u, { cache: 'reload' }))));
     self.skipWaiting();
   })());
 });
