@@ -3003,7 +3003,7 @@ function GlobalAwakeningPlatform() {
   }, s.body)))));
   if (showNicknamePrompt) {
     return React.createElement("div", {
-      className: "min-h-screen bg-gradient flex items-center justify-center p-4",
+      className: "min-h-screen bg-gradient flex flex-col items-center justify-center p-4",
       style: {
         paddingBottom: '3.5rem'
       }

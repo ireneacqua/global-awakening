@@ -2643,7 +2643,7 @@
 
           if (showNicknamePrompt) {
             return (
-              <div className="min-h-screen bg-gradient flex items-center justify-center p-4" style={{paddingBottom: '3.5rem'}}>
+              <div className="min-h-screen bg-gradient flex flex-col items-center justify-center p-4" style={{paddingBottom: '3.5rem'}}>
                 <div className="absolute top-4 right-4">
                   <button onClick={() => setLang(lang === 'en' ? 'it' : 'en')} className="btn-secondary">
                     {lang === 'en' ? '🌐 EN' : '🌐 IT'}
