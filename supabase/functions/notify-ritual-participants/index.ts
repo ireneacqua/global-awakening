@@ -59,7 +59,7 @@ Deno.serve(async () => {
             to_email: profile.email,
             subject: '🌟 A ritual you joined is starting soon!',
             message: `The ritual "${ritual.name}" starts in about 15 minutes!`,
-            magic_url: 'https://ireneacqua.github.io/global-awakening/app.html',
+            magic_url: 'https://global-awakening.github.io/app.html',
             cta_text: 'Join Now',
             footer: `${ritual.date} at ${ritual.time} UTC — ${ritual.duration} minutes`
           }

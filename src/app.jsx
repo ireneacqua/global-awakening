@@ -280,7 +280,7 @@
                 { heading: "Why we use it", body: "Only to make the app work: signing you in, powering the telepathy, rituals and community features, and showing in-app notifications. We never sell your data or use it for advertising." },
                 { heading: "Where it lives", body: "Your data is stored on Supabase (our database). Transactional emails (password reset and magic link) are sent through EmailJS. The site is hosted on GitHub Pages. We share data with these providers only as needed to run the service." },
                 { heading: "How long we keep it", body: "Account and activity data are kept while your account is active. Password-reset and magic-link tokens expire within 15 minutes." },
-                { heading: "Your rights", body: "Under the GDPR you can access, correct, delete or export your data, or object to its use. Export and account deletion are available self-service from your profile (open your profile → \"Your data (GDPR)\"). For correction or objection, open an issue on our public GitHub repository (github.com/ireneacqua/global-awakening)." },
+                { heading: "Your rights", body: "Under the GDPR you can access, correct, delete or export your data, or object to its use. Export and account deletion are available self-service from your profile (open your profile → \"Your data (GDPR)\"). For correction or objection, open an issue on our public GitHub repository (github.com/global-awakening/global-awakening.github.io)." },
                 { heading: "Security", body: "Data is stored on Supabase and passwords are kept hashed, never in plain text. As a small personal project we cannot guarantee enterprise-grade security — please don't share anything you wouldn't want others to potentially see." },
                 { heading: "Changes", body: "The version shown here is always the current one. If anything important changes, we'll update this page." }
               ],
@@ -569,7 +569,7 @@
                 { heading: "Perché li usiamo", body: "Solo per far funzionare l'app: accesso, funzionalità di telepatia, rituali e community, e notifiche all'interno dell'app. Non vendiamo mai i tuoi dati né li usiamo per pubblicità." },
                 { heading: "Dove sono conservati", body: "I tuoi dati sono conservati su Supabase (il nostro database). Le email transazionali (reset password e magic link) vengono inviate tramite EmailJS. Il sito è ospitato su GitHub Pages. Condividiamo i dati con questi fornitori solo per quanto necessario a far funzionare il servizio." },
                 { heading: "Per quanto tempo li conserviamo", body: "I dati dell'account e di attività restano finché il tuo account è attivo. I token di reset password e magic link scadono entro 15 minuti." },
-                { heading: "I tuoi diritti", body: "In base al GDPR puoi accedere, rettificare, cancellare o esportare i tuoi dati, oppure opporti al loro utilizzo. Export ed eliminazione dell'account sono disponibili in autonomia dal tuo profilo (apri il profilo → \"I tuoi dati (GDPR)\"). Per rettifica o opposizione, apri una issue sul nostro repository GitHub pubblico (github.com/ireneacqua/global-awakening)." },
+                { heading: "I tuoi diritti", body: "In base al GDPR puoi accedere, rettificare, cancellare o esportare i tuoi dati, oppure opporti al loro utilizzo. Export ed eliminazione dell'account sono disponibili in autonomia dal tuo profilo (apri il profilo → \"I tuoi dati (GDPR)\"). Per rettifica o opposizione, apri una issue sul nostro repository GitHub pubblico (github.com/global-awakening/global-awakening.github.io)." },
                 { heading: "Sicurezza", body: "I dati sono conservati su Supabase e le password sono salvate sotto forma di hash, mai in chiaro. Trattandosi di un piccolo progetto personale non possiamo garantire una sicurezza di livello aziendale: ti invitiamo a non condividere nulla che non vorresti potesse essere visto da altri." },
                 { heading: "Modifiche", body: "La versione mostrata qui è sempre quella attuale. Se qualcosa di importante cambia, aggiorneremo questa pagina." }
               ],
@@ -2606,7 +2606,7 @@
                 {t.privacy.linkLabel}
               </button>
               <span style={{margin: '0 0.4rem'}}>·</span>
-              <a href="https://github.com/ireneacqua/global-awakening/issues" target="_blank" rel="noopener noreferrer"
+              <a href="https://github.com/global-awakening/global-awakening.github.io/issues" target="_blank" rel="noopener noreferrer"
                  style={{color: '#a78bfa', textDecoration: 'underline', cursor: 'pointer', minHeight: '40px', display: 'inline-flex', alignItems: 'center'}}>
                 {t.reportIssue}
               </a>

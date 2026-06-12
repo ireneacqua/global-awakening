@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     });
 
     // Costruisce il link di reset
-    const base = appUrl || 'https://ireneacqua.github.io/global-awakening/app.html';
+    const base = appUrl || 'https://global-awakening.github.io/app.html';
     const resetLink = `${base}?reset=${token}`;
 
     // Manda la mail via Resend

@@ -489,7 +489,7 @@ const translations = {
         body: "Account and activity data are kept while your account is active. Password-reset and magic-link tokens expire within 15 minutes."
       }, {
         heading: "Your rights",
-        body: "Under the GDPR you can access, correct, delete or export your data, or object to its use. Export and account deletion are available self-service from your profile (open your profile → \"Your data (GDPR)\"). For correction or objection, open an issue on our public GitHub repository (github.com/ireneacqua/global-awakening)."
+        body: "Under the GDPR you can access, correct, delete or export your data, or object to its use. Export and account deletion are available self-service from your profile (open your profile → \"Your data (GDPR)\"). For correction or objection, open an issue on our public GitHub repository (github.com/global-awakening/global-awakening.github.io)."
       }, {
         heading: "Security",
         body: "Data is stored on Supabase and passwords are kept hashed, never in plain text. As a small personal project we cannot guarantee enterprise-grade security — please don't share anything you wouldn't want others to potentially see."
@@ -795,7 +795,7 @@ const translations = {
         body: "I dati dell'account e di attività restano finché il tuo account è attivo. I token di reset password e magic link scadono entro 15 minuti."
       }, {
         heading: "I tuoi diritti",
-        body: "In base al GDPR puoi accedere, rettificare, cancellare o esportare i tuoi dati, oppure opporti al loro utilizzo. Export ed eliminazione dell'account sono disponibili in autonomia dal tuo profilo (apri il profilo → \"I tuoi dati (GDPR)\"). Per rettifica o opposizione, apri una issue sul nostro repository GitHub pubblico (github.com/ireneacqua/global-awakening)."
+        body: "In base al GDPR puoi accedere, rettificare, cancellare o esportare i tuoi dati, oppure opporti al loro utilizzo. Export ed eliminazione dell'account sono disponibili in autonomia dal tuo profilo (apri il profilo → \"I tuoi dati (GDPR)\"). Per rettifica o opposizione, apri una issue sul nostro repository GitHub pubblico (github.com/global-awakening/global-awakening.github.io)."
       }, {
         heading: "Sicurezza",
         body: "I dati sono conservati su Supabase e le password sono salvate sotto forma di hash, mai in chiaro. Trattandosi di un piccolo progetto personale non possiamo garantire una sicurezza di livello aziendale: ti invitiamo a non condividere nulla che non vorresti potesse essere visto da altri."
@@ -2912,7 +2912,7 @@ function GlobalAwakeningPlatform() {
       margin: '0 0.4rem'
     }
   }, "\xB7"), React.createElement("a", {
-    href: "https://github.com/ireneacqua/global-awakening/issues",
+    href: "https://github.com/global-awakening/global-awakening.github.io/issues",
     target: "_blank",
     rel: "noopener noreferrer",
     style: {
