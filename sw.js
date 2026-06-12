@@ -1,7 +1,7 @@
 // Service worker PWA Global Awakening.
 // Strategia: network-first per navigazione/app.html/app.js (aggiornamenti sempre freschi,
 // cache solo come fallback offline), cache-first per CDN immutabili e icone, no-cache per Supabase/EmailJS.
-const CACHE = 'ga-pwa-v4';
+const CACHE = 'ga-pwa-v5';
 const PRECACHE = [
   'app.html', 'app.js', 'index.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',

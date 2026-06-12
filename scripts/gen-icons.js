@@ -26,19 +26,22 @@ function page(sizePx, starScalePct) {
   const out = path.join(__dirname, '..', 'icons');
   fs.mkdirSync(out, { recursive: true });
 
+  // Tutte "any maskable": stella al 60% = dentro la safe-zone del mascheramento
+  // Android (cerchio dell'80%), sfondo viola a tutto fondo → niente piattino bianco
+  // nello splash/launcher, e la stella non viene mai tagliata.
   // any 512
   await p.setViewportSize({ width: 512, height: 512 });
-  await p.setContent(page(512, 78));
+  await p.setContent(page(512, 60));
   await p.locator('.bg').screenshot({ path: path.join(out, 'icon-512.png') });
 
   // any 192
   await p.setViewportSize({ width: 192, height: 192 });
-  await p.setContent(page(192, 78));
+  await p.setContent(page(192, 60));
   await p.locator('.bg').screenshot({ path: path.join(out, 'icon-192.png') });
 
   // maskable 512 (stella piccola per la safe-zone Android)
   await p.setViewportSize({ width: 512, height: 512 });
-  await p.setContent(page(512, 52));
+  await p.setContent(page(512, 60));
   await p.locator('.bg').screenshot({ path: path.join(out, 'icon-maskable-512.png') });
 
   await browser.close();
